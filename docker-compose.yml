@@ -17,9 +17,8 @@ services:
       - DATA_DIR=/app/data
 
     # Persistentes Volume für User-Daten
-    # WICHTIG: In Coolify UI muss ein Persistent Volume konfiguriert werden:
-    # Name: crowdbot-data
-    # Mount Path: /app/data
+    # Docker erstellt automatisch ein named volume beim ersten Start
+    # Dieses Volume bleibt erhalten, auch wenn der Container neu erstellt wird
     volumes:
       - crowdbot-data:/app/data
 
@@ -50,5 +49,3 @@ services:
 
 volumes:
   crowdbot-data:
-    name: crowdbot-data
-    external: true

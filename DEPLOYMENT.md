@@ -1,195 +1,190 @@
-# Deployment auf Coolify
+# Deployment Guide
 
-## KRITISCH: Persistenter Storage Setup
+## Persistenter Storage
 
-Der Bot speichert User-Daten (Memory 2.0) im `/app/data` Verzeichnis. Damit diese Daten nach Redeployments erhalten bleiben, MUSS ein Persistent Volume in Coolify konfiguriert werden.
+Der Bot speichert User-Daten (Memory 2.0) im `/app/data` Verzeichnis. Docker Compose erstellt automatisch ein persistentes Volume, das bei Redeployments erhalten bleibt.
 
-## Schritt-für-Schritt Anleitung
+## Allgemeine Docker-Lösung
 
-### 1. Persistent Volume in Coolify erstellen
-
-**WICHTIG: Dies muss VOR dem ersten Deployment gemacht werden!**
-
-1. Öffne dein Coolify Dashboard
-2. Gehe zu "Storages" oder "Persistent Volumes"
-3. Klicke auf "Add New Storage" oder "Create Persistent Volume"
-4. Konfiguration:
-   - **Name**: `crowdbot-data`
-   - **Type**: Persistent Volume
-   - **Driver**: local (Standard)
-   - **Mount Path** (optional): `/var/lib/docker/volumes/crowdbot-data/_data`
-
-5. Klicke auf "Create" oder "Save"
-
-### 2. Volume dem Service zuweisen
-
-1. Gehe zu deinem Crowdbot Service in Coolify
-2. Öffne den Tab "Storages" oder "Volumes"
-3. Klicke auf "Add Storage"
-4. Konfiguration:
-   - **Source**: `crowdbot-data` (das eben erstellte Volume)
-   - **Destination**: `/app/data`
-   - **Mount Type**: Volume
-
-5. Speichern
-
-**Alternativ**: Die docker-compose.yml definiert bereits das Volume. Coolify sollte es automatisch erkennen und in der UI anzeigen. Du musst dann nur noch bestätigen, dass es als "external" bzw. "persistent" markiert ist.
-
-### 3. Umgebungsvariablen setzen
-
-In Coolify unter "Environment Variables":
-
-- `TELEGRAM_BOT_TOKEN`: Dein Bot-Token vom @BotFather
-- `ALLOWED_USER_IDS`: Komma-separierte User-IDs (z.B. `7043093505`)
-- `RATE_LIMIT_PER_MINUTE`: Optional (Standard: 10)
-
-### 4. Deployment starten
-
-1. Klicke auf "Deploy" in Coolify
-2. Warte bis Build abgeschlossen ist (1-2 Minuten)
-3. Bot sollte jetzt laufen
-
-### 5. Bot initialisieren
-
-In Telegram:
-1. Sende `/start` an deinen Bot
-2. Dies erstellt die Memory-Struktur im persistenten Volume
-3. Importiere Infos: `/import crowdcompany.info`
-
-### 6. Persistence verifizieren (WICHTIG!)
-
-**Test 1: Volume-Inhalt prüfen**
-
-Im Coolify Terminal oder SSH:
-
-```bash
-# Prüfe ob Volume existiert
-docker volume ls | grep crowdbot-data
-
-# Prüfe Inhalt
-docker volume inspect crowdbot-data
-
-# Zeige Dateien im Volume
-docker exec crowdbot ls -la /app/data/users/
-
-# Sollte anzeigen:
-# drwxr-xr-x 2 botuser botuser 4096 Jan 30 20:15 7043093505
-```
-
-**Test 2: Redeployment-Test**
-
-1. Löse ein weiteres Redeployment in Coolify aus
-2. Warte bis Deployment fertig ist
-3. Sende OHNE `/start` eine Nachricht an den Bot
-4. Bot sollte NICHT "Bitte starte den Bot erst mit /start!" sagen
-5. Frage: "Welche Informationen hast du über mich?"
-6. Bot sollte die vorher importierten Infos kennen
-
-## Technische Details
-
-### Volume-Konfiguration
-
-Die `docker-compose.yml` definiert:
+Die `docker-compose.yml` definiert ein Named Volume:
 
 ```yaml
 volumes:
   crowdbot-data:
-    name: crowdbot-data
-    external: true
 ```
 
-**`external: true`** bedeutet: Das Volume existiert bereits außerhalb des Compose-Stacks und wird nicht gelöscht, wenn der Stack neu erstellt wird.
+Dieses Volume wird automatisch erstellt und bleibt bestehen, auch wenn der Container neu gebaut oder neu gestartet wird. Diese Lösung funktioniert auf:
 
-### Warum relativer Pfad (`./data`) NICHT funktioniert
+- Coolify
+- Render.com
+- AWS ECS (mit entsprechendem Plugin)
+- Eigenen Servern mit Docker/Docker Compose
+- Allen Docker-kompatiblen Plattformen
 
-Bei Git-basierten Deployments:
-1. Coolify klont das Repo in ein temporäres Verzeichnis
-2. Jedes Redeployment = neuer Checkout
-3. `./data` ist relativ zum Checkout → wird jedes Mal neu erstellt
-4. Alte Daten gehen verloren
+## Deployment auf verschiedenen Plattformen
 
-**Lösung**: External Named Volume, das außerhalb des Projekt-Checkouts existiert.
+### Coolify
+
+1. **Repository verbinden**
+   - GitHub Repository URL eingeben
+   - Branch auswählen (z.B. `main`)
+   - Coolify erkennt automatisch die `docker-compose.yml`
+
+2. **Umgebungsvariablen setzen**
+   - `TELEGRAM_BOT_TOKEN`: Token vom @BotFather
+   - `ALLOWED_USER_IDS`: Komma-separierte User-IDs (z.B. `7043093505`)
+   - `RATE_LIMIT_PER_MINUTE`: Optional (Standard: 10)
+
+3. **Deploy**
+   - Klicke auf "Deploy"
+   - Warte bis Build fertig ist (1-2 Minuten)
+
+4. **Bot initialisieren** (in Telegram)
+   - `/start` - Erstellt Memory-Struktur
+   - `/import crowdcompany.info` - Importiert deine Daten
+
+### Eigener Server (Docker Compose)
+
+```bash
+# Repository klonen
+git clone https://github.com/Crowdcompany/CrowdCompanyBot.git
+cd CrowdCompanyBot
+
+# .env Datei erstellen
+cp .env.example .env
+# TELEGRAM_BOT_TOKEN und ALLOWED_USER_IDS setzen
+
+# Starten
+docker-compose up -d
+
+# Logs ansehen
+docker-compose logs -f crowdbot
+```
+
+### Render.com
+
+1. Neuen Service erstellen (Docker)
+2. Repository verbinden
+3. Umgebungsvariablen setzen (siehe oben)
+4. Persistent Disk hinzufügen:
+   - Mount Path: `/app/data`
+   - Size: 1GB (oder mehr)
+5. Deploy
+
+## Wie funktioniert die Persistence?
+
+Docker Compose erstellt beim ersten Start ein Named Volume. Dieses Volume:
+
+- Existiert unabhängig vom Container
+- Überlebt Container-Neuerstellungen
+- Wird beim `docker-compose down` NICHT gelöscht (außer mit `-v` Flag)
+- Ist bei Redeployments automatisch verfügbar
+
+**Volume-Name:** Coolify und andere Plattformen fügen automatisch Prefixe hinzu (z.B. Projekt-Name), was in Ordnung ist. Der Inhalt bleibt erhalten.
+
+## Verifikation nach Deployment
+
+### Test 1: Volume prüfen
+
+```bash
+# Zeige alle Volumes
+docker volume ls
+
+# Sollte ein Volume mit "crowdbot-data" im Namen zeigen
+# z.B.: myproject_crowdbot-data oder uuid_crowdbot-data
+
+# Zeige Dateien im Volume
+docker exec crowdbot ls -la /app/data/users/
+
+# Sollte User-Verzeichnisse anzeigen (nach /start):
+# drwxr-xr-x 2 botuser botuser 4096 Jan 30 20:15 7043093505
+```
+
+### Test 2: Persistence testen
+
+1. Bot initialisieren: `/start` in Telegram
+2. Daten importieren: `/import crowdcompany.info`
+3. Frage: "Welche Informationen hast du über mich?"
+4. Bot sollte die importierten Infos kennen
+5. **Redeployment auslösen**
+6. Direkt nach Redeployment: Sende eine Nachricht (OHNE `/start`)
+7. Bot sollte dich noch kennen und NICHT "Bitte starte den Bot erst mit /start!" sagen
+8. Frage wieder: "Welche Informationen hast du über mich?"
+9. Alle Daten sollten noch da sein
 
 ## Troubleshooting
 
 ### Problem: Daten gehen nach Redeployment verloren
 
-**Ursache 1**: Volume wurde nicht als `external` erstellt
+**Ursache 1**: Volume wurde versehentlich gelöscht
 
-**Lösung**:
 ```bash
-# SSH auf Coolify-Server
+# Prüfe ob Volume existiert
 docker volume ls | grep crowdbot
 
-# Wenn Volume fehlt, manuell erstellen:
-docker volume create crowdbot-data
-
-# Danach Redeploy
+# Volume sollte vorhanden sein
+# Falls nicht, wurde es mit docker-compose down -v gelöscht
 ```
 
-**Ursache 2**: Volume ist nicht im Service gemountet
+**Lösung**: Nie `docker-compose down -v` verwenden (das `-v` löscht Volumes!)
 
-**Lösung**:
-1. Prüfe in Coolify UI unter "Storages"
-2. Volume muss auf `/app/data` gemountet sein
-3. Mount Type muss "Volume" sein (nicht "Bind")
+**Ursache 2**: Falsches Volume gemountet
 
-### Problem: Permission Denied beim Schreiben
-
-**Fehler**: Bot kann nicht in `/app/data` schreiben
-
-**Lösung**:
-```bash
-# SSH auf Coolify-Server
-docker exec crowdbot whoami
-# Sollte: botuser
-
-# Prüfe Permissions im Volume
-docker exec crowdbot ls -la /app/data
-# Sollte: drwxr-xr-x botuser botuser
-
-# Falls falsche Permissions:
-docker exec -u root crowdbot chown -R botuser:botuser /app/data
-docker exec -u root crowdbot chmod 755 /app/data
-```
-
-### Problem: Volume existiert aber ist leer nach Redeployment
-
-**Ursache**: Falsches Volume wird gemountet
-
-**Lösung**:
 ```bash
 # Prüfe welches Volume tatsächlich gemountet ist
 docker inspect crowdbot | grep -A 10 Mounts
 
 # Sollte zeigen:
-# "Source": "/var/lib/docker/volumes/crowdbot-data/_data"
+# "Source": "/var/lib/docker/volumes/.../crowdbot-data/_data"
 # "Destination": "/app/data"
 ```
 
-## Backup-Strategie
+### Problem: Permission Denied beim Schreiben
 
-### Automatisches Backup
+```bash
+# Prüfe User im Container
+docker exec crowdbot whoami
+# Sollte: botuser
+
+# Prüfe Permissions
+docker exec crowdbot ls -la /app/data
+
+# Falls Permissions falsch:
+docker exec -u root crowdbot chown -R botuser:botuser /app/data
+docker exec -u root crowdbot chmod 755 /app/data
+```
+
+### Problem: Volume ist leer nach Redeployment
+
+Das sollte mit der aktuellen Konfiguration nicht passieren. Falls doch:
+
+1. Prüfe ob das Volume existiert: `docker volume ls`
+2. Prüfe ob es gemountet ist: `docker inspect crowdbot`
+3. Prüfe Plattform-spezifische Volume-Verwaltung
+
+Falls das Volume bei jedem Deployment neu erstellt wird (erkennbar an leerem Inhalt), kontaktiere den Plattform-Support oder prüfe Plattform-spezifische Dokumentation.
+
+## Backup und Restore
+
+### Backup erstellen
 
 ```bash
 #!/bin/bash
 # backup-crowdbot.sh
 
-BACKUP_DIR="/var/backups/crowdbot"
+BACKUP_DIR="./backups"
 DATE=$(date +%Y%m%d_%H%M%S)
+VOLUME_NAME=$(docker volume ls | grep crowdbot-data | awk '{print $2}')
 
 mkdir -p "$BACKUP_DIR"
 
 # Volume-Daten sichern
 docker run --rm \
-  -v crowdbot-data:/data \
-  -v "$BACKUP_DIR":/backup \
-  alpine tar czf /backup/crowdbot-data-$DATE.tar.gz -C /data .
+  -v "$VOLUME_NAME":/data \
+  -v "$(pwd)/$BACKUP_DIR":/backup \
+  alpine tar czf /backup/crowdbot-$DATE.tar.gz -C /data .
 
-# Alte Backups löschen (älter als 30 Tage)
-find "$BACKUP_DIR" -name "crowdbot-data-*.tar.gz" -mtime +30 -delete
-
-echo "Backup erstellt: crowdbot-data-$DATE.tar.gz"
+echo "Backup erstellt: $BACKUP_DIR/crowdbot-$DATE.tar.gz"
 ```
 
 ### Backup wiederherstellen
@@ -199,6 +194,7 @@ echo "Backup erstellt: crowdbot-data-$DATE.tar.gz"
 # restore-crowdbot.sh
 
 BACKUP_FILE=$1
+VOLUME_NAME=$(docker volume ls | grep crowdbot-data | awk '{print $2}')
 
 if [ -z "$BACKUP_FILE" ]; then
   echo "Usage: $0 <backup-file.tar.gz>"
@@ -210,9 +206,9 @@ docker stop crowdbot
 
 # Backup wiederherstellen
 docker run --rm \
-  -v crowdbot-data:/data \
-  -v $(dirname "$BACKUP_FILE"):/backup \
-  alpine sh -c "cd /data && tar xzf /backup/$(basename "$BACKUP_FILE")"
+  -v "$VOLUME_NAME":/data \
+  -v "$(pwd)":/backup \
+  alpine sh -c "cd /data && tar xzf /backup/$BACKUP_FILE"
 
 # Bot starten
 docker start crowdbot
@@ -220,15 +216,39 @@ docker start crowdbot
 echo "Backup wiederhergestellt: $BACKUP_FILE"
 ```
 
-## Checkliste für neues Deployment
+## Technische Details
 
-- [ ] Persistent Volume `crowdbot-data` in Coolify erstellt
-- [ ] Volume als "external" markiert
-- [ ] Volume dem Service zugewiesen: Source=`crowdbot-data`, Destination=`/app/data`
-- [ ] Umgebungsvariablen gesetzt: `TELEGRAM_BOT_TOKEN`, `ALLOWED_USER_IDS`
+### Volume-Lifecycle
+
+1. **Erster Start**: Docker erstellt das Volume automatisch
+2. **Container-Neustart**: Volume bleibt erhalten
+3. **Redeployment**: Volume wird wiederverwendet
+4. **docker-compose down**: Volume bleibt erhalten
+5. **docker-compose down -v**: Volume wird gelöscht (VORSICHT!)
+
+### Volume-Naming
+
+Plattformen fügen oft Prefixe hinzu:
+
+- Coolify: `<uuid>_crowdbot-data`
+- Docker Compose: `<projektname>_crowdbot-data`
+- Render: Eigenes Persistent Disk System
+
+Das ist normal und funktioniert korrekt, solange das Volume bei Redeployments wiederverwendet wird.
+
+## Best Practices
+
+1. **Nie `-v` Flag verwenden** beim Stoppen: `docker-compose down` statt `docker-compose down -v`
+2. **Regelmäßige Backups**: Automatisiere das Backup-Script
+3. **Test nach Deployment**: Führe immer den Persistence-Test durch
+4. **Monitoring**: Überwache Volume-Größe: `docker system df -v`
+
+## Checkliste
+
+- [ ] Umgebungsvariablen gesetzt (TELEGRAM_BOT_TOKEN, ALLOWED_USER_IDS)
 - [ ] Erstes Deployment durchgeführt
 - [ ] Bot mit `/start` initialisiert
 - [ ] Test-Daten importiert (z.B. `/import crowdcompany.info`)
-- [ ] Zweites Redeployment zum Testen der Persistence
-- [ ] Daten sind nach Redeployment noch vorhanden
-- [ ] Backup-Strategie konfiguriert
+- [ ] Volume-Existenz geprüft (`docker volume ls`)
+- [ ] Persistence-Test durchgeführt (Redeployment + Datenprüfung)
+- [ ] Backup-Strategie eingerichtet
