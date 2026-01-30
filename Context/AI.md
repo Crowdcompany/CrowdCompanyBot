@@ -1,0 +1,1 @@
+Wir nutzen z.ai Glm 4.7 Als Künstliche Intelligenz um mit unserem Bot zu arbeiten. Wir haben eine entsprechende Datei im Projektverzeichnis die den API Key enthält. Damit kannst du dich verbinden und damit wird auch der Bot betrieben, den wir bauen wollen.

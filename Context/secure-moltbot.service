@@ -1,0 +1,96 @@
+[Unit]
+Description=Secure Moltbot Gateway
+Documentation=https://docs.molt.bot
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=moltbot
+Group=moltbot
+
+# Umgebungsvariablen
+EnvironmentFile=/home/moltbot/.moltbot/.env
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+# Working Directory
+WorkingDirectory=/home/moltbot
+
+# ============================================================================
+# SECURITY HARDENING
+# ============================================================================
+
+# Process Isolation
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+# Nur diese Pfade beschreibbar
+ReadWritePaths=/home/moltbot/.moltbot
+ReadWritePaths=/home/moltbot/.moltbot-encrypted
+ReadWritePaths=/home/moltbot/clawd
+
+# Kernel & Hardware Protection
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+
+# Network Isolation
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressAllow=127.0.0.1/8 ::1/128
+# Wenn Tailscale genutzt wird:
+# IPAddressAllow=100.64.0.0/10
+
+# System Calls
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap
+SystemCallErrorNumber=EPERM
+
+# Capabilities (minimal)
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Ressourcen-Limits
+LimitNOFILE=65536
+LimitNPROC=512
+MemoryMax=2G
+TasksMax=256
+
+# Namespaces
+PrivateDevices=true
+PrivateUsers=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=moltbot
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+
+ExecStartPre=/usr/bin/docker pull moltbot-sandbox:latest
+ExecStart=/usr/local/bin/secure-moltbot-wrapper.sh
+
+# Graceful Shutdown
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Auto-Restart
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=multi-user.target

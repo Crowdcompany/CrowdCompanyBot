@@ -16,9 +16,10 @@ from telegram.ext import (
     ContextTypes
 )
 
-from src.memory_manager import MemoryManager
+from src.memory_manager_v2 import MemoryManagerV2
 from src.llm_client import LLMClient
 from src.search_module import SearchModule
+from src.web_import import WebImporter
 from dotenv import load_dotenv
 import os
 
@@ -80,9 +81,10 @@ class Crowdbot:
             )
 
         # Komponenten initialisieren
-        self.memory_manager = MemoryManager(data_dir=data_dir)
+        self.memory_manager = MemoryManagerV2(data_dir=data_dir)
         self.llm_client = LLMClient()
         self.search_module = SearchModule()
+        self.web_importer = WebImporter(data_dir=data_dir)
 
         # Tool registrieren: web_search
         self.llm_client.register_tool(
@@ -206,6 +208,7 @@ class Crowdbot:
         self.application.add_handler(CommandHandler("search", self.search_command))
         self.application.add_handler(CommandHandler("searchmd", self.search_md_command))
         self.application.add_handler(CommandHandler("deepresearch", self.deep_research_command))
+        self.application.add_handler(CommandHandler("import", self.import_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
@@ -281,6 +284,7 @@ class Crowdbot:
             "/search <Anfrage> - Schnelle Fakten-Suche (Perplexity)\n"
             "/deepresearch <Anfrage> - Ausführliche Analyse (Jina Deep Research)\n"
             "/searchmd <Anfrage> - Suche mit Markdown-Datei\n"
+            "/import <URL> [dateiname] - Importiere Webseite dauerhaft ins Memory\n"
             "/help - Zeigt diese Hilfe an\n\n"
             "Über Crowdbot:\n"
             "Ich bin ein selbst gehosteter KI-Assistent. "
@@ -289,6 +293,10 @@ class Crowdbot:
             "Ich kann automatisch im Internet suchen, wenn du nach aktuellen Informationen fragst. "
             "Ich nutze Perplexity für schnelle Fakten wie TV-Programm, Nachrichten oder allgemeine Fragen.\n"
             "Für tiefgehende Analysen nutze /deepresearch.\n\n"
+            "Web-Import:\n"
+            "Mit /import kannst du Webseiten dauerhaft in dein Memory importieren. "
+            "Der Inhalt wird bereinigt und in important/ gespeichert, wo er nie gelöscht wird. "
+            "Perfekt für Dokumentationen, Artikel oder wichtige Informationen.\n\n"
             "Schreib mir einfach eine Nachricht, um ins Gespräch zu kommen!"
         )
 
@@ -508,6 +516,70 @@ class Crowdbot:
             )
             logger.error(f"Deep Research lieferte keine Ergebnisse für: {query}")
 
+    async def import_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handler für den /import Befehl.
+
+        Importiert eine Webseite und speichert sie dauerhaft im Memory.
+        Format: /import <URL> [optionaler_dateiname]
+        """
+        if not await self.check_authorization(update):
+            return
+
+        user_id = update.effective_user.id
+
+        # Prüfe ob Argumente angegeben wurden
+        if not context.args:
+            await update.message.reply_text(
+                "Bitte gib eine URL an!\n\n"
+                "Verwendung: /import <URL> [dateiname]\n\n"
+                "Beispiel: /import https://example.com/artikel wichtiger_artikel\n\n"
+                "Die Webseite wird geladen, bereinigt und dauerhaft in deinem Memory gespeichert."
+            )
+            return
+
+        url = context.args[0]
+        custom_filename = " ".join(context.args[1:]) if len(context.args) > 1 else None
+
+        # Prüfen, ob Benutzer existiert
+        if not self.memory_manager.user_exists(user_id):
+            await update.message.reply_text(
+                "Bitte starte den Bot erst mit /start!"
+            )
+            return
+
+        # Typing-Indikator anzeigen
+        await update.message.chat.send_action("typing")
+
+        # Info-Nachricht
+        await update.message.reply_text(
+            f"🌐 Importiere Webseite: {url}\n\n"
+            "Dies kann einen Moment dauern..."
+        )
+
+        # Import durchführen
+        success, message = self.web_importer.import_url(user_id, url, custom_filename)
+
+        if success:
+            # Erfolg - speichere auch in Memory für Kontext
+            self.memory_manager.append_message(
+                user_id,
+                "user",
+                f"/import {url}" + (f" {custom_filename}" if custom_filename else "")
+            )
+            self.memory_manager.append_message(user_id, "assistant", message)
+
+            # TTS-kompatible Nachricht
+            tts_message = self._remove_markdown(message)
+            await update.message.reply_text(tts_message)
+
+            logger.info(f"Web-Import erfolgreich: {url} für User {user_id}")
+        else:
+            # Fehler
+            error_message = f"Fehler beim Importieren der Webseite:\n\n{message}"
+            await update.message.reply_text(error_message)
+            logger.error(f"Web-Import fehlgeschlagen: {url} - {message}")
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Handler für Textnachrichten.
@@ -565,9 +637,33 @@ class Crowdbot:
             )
             logger.error(f"LLM-Antwort war None für User {user_id}")
 
+    async def post_init(self, application):
+        """
+        Wird nach dem Start ausgeführt.
+        Registriert Bot-Commands bei Telegram.
+        """
+        from telegram import BotCommand
+
+        commands = [
+            BotCommand("start", "Bot starten oder begrüßen"),
+            BotCommand("reset", "Gedächtnis zurücksetzen"),
+            BotCommand("help", "Hilfe anzeigen"),
+            BotCommand("search", "Schnelle Faktensuche"),
+            BotCommand("searchmd", "Suche mit Markdown-Datei"),
+            BotCommand("deepresearch", "Ausführliche Analyse"),
+            BotCommand("import", "Webseite ins Memory importieren"),
+        ]
+
+        await application.bot.set_my_commands(commands)
+        logger.info("Bot-Commands bei Telegram registriert")
+
     def run(self):
         """Startet den Bot."""
         logger.info("Crowdbot wird gestartet...")
+
+        # Post-Init Hook registrieren
+        self.application.post_init = self.post_init
+
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

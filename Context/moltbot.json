@@ -1,0 +1,171 @@
+{
+  "gateway": {
+    "bind": "127.0.0.1",
+    "port": 18789,
+    "token": "${GATEWAY_TOKEN}",
+    "controlUi": {
+      "enabled": true,
+      "requireDevicePairing": true,
+      "allowInsecureAuth": false,
+      "dangerouslyDisableDeviceAuth": false
+    },
+    "trustedProxies": [],
+    "discovery": {
+      "bonjour": {
+        "enabled": false,
+        "mode": "minimal"
+      }
+    }
+  },
+  
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "zai/glm-4.7"
+      },
+      "models": {
+        "zai/glm-4.7": {
+          "alias": "GLM",
+          "params": {
+            "thinking": {
+              "type": "enabled",
+              "budgetTokens": 16384
+            },
+            "temperature": 0.7,
+            "maxTokens": 8192
+          }
+        },
+        "anthropic/claude-haiku-4-5": {
+          "alias": "Haiku",
+          "comment": "Fallback für kritische Cron-Jobs (GLM hat Context-Bug)"
+        }
+      },
+      
+      "workspace": "~/clawd",
+      
+      "sandbox": {
+        "mode": "non-main",
+        "image": "moltbot-sandbox:latest",
+        "allowlist": [
+          "bash",
+          "process",
+          "read",
+          "write",
+          "edit",
+          "sessions_list",
+          "sessions_history",
+          "sessions_send",
+          "jina_fetch"
+        ],
+        "denylist": [
+          "browser",
+          "canvas",
+          "nodes",
+          "elevated"
+        ]
+      },
+      
+      "heartbeat": {
+        "every": "30m",
+        "model": "zai/glm-4.7",
+        "includeReasoning": false
+      },
+      
+      "tools": {
+        "exec": {
+          "enabled": true,
+          "requireApproval": false,
+          "host": "sandbox"
+        },
+        "web_search": {
+          "enabled": false,
+          "comment": "Nutze jina_fetch stattdessen"
+        },
+        "web_fetch": {
+          "enabled": false,
+          "comment": "Nutze jina_fetch stattdessen"
+        }
+      }
+    }
+  },
+  
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "requirePairing": true,
+      "tokenFile": "~/.moltbot/credentials/telegram.token",
+      "allowFrom": [],
+      "groups": {
+        "*": {
+          "requireMention": true,
+          "activation": "mention"
+        }
+      }
+    },
+    
+    "whatsapp": {
+      "enabled": false,
+      "requirePairing": true,
+      "allowFrom": [],
+      "groups": {
+        "*": {
+          "requireMention": true,
+          "activation": "mention"
+        }
+      }
+    },
+    
+    "slack": {
+      "enabled": false,
+      "comment": "Für Inter-Bot-Communication zwischen Adam/Berta/Charlie"
+    }
+  },
+  
+  "messages": {
+    "groupChat": {
+      "mentionPatterns": [
+        "@bot",
+        "bot:",
+        "hey bot"
+      ]
+    }
+  },
+  
+  "automation": {
+    "webhook": {
+      "enabled": true,
+      "endpoints": [
+        {
+          "url": "https://your-monitoring-service.com/webhook",
+          "events": [
+            "gateway.unauthorized_access",
+            "pairing.request",
+            "tool.elevated_exec",
+            "security.anomaly"
+          ],
+          "secret": "${WEBHOOK_SECRET}",
+          "enabled": false
+        }
+      ]
+    },
+    
+    "cron": {
+      "jobs": []
+    }
+  },
+  
+  "logging": {
+    "level": "info",
+    "file": "~/.moltbot/logs/gateway.log",
+    "maxSize": "10m",
+    "maxFiles": 5,
+    "redactSecrets": true
+  },
+  
+  "usage": {
+    "tracking": {
+      "enabled": true,
+      "file": "~/.moltbot/usage.json"
+    }
+  }
+}

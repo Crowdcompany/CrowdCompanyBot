@@ -13,13 +13,18 @@ Ein selbst gehosteter KI-Assistent als sichere Alternative zu Moltbot.
 
 ## Status
 
-**Phase 7 - Sicherheits-Härtung** (in Arbeit)
+**Version 1.0 - Produktiv Einsetzbar** (Stand: 30. Januar 2026)
 
-- ✓ Telegram-Authentifizierung implementiert
-- ✓ GLM-4.7 Sprachmodell integriert
-- ✓ Markdown-Gedächtnis funktionsfähig
-- ✓ Internet-Suche mit Jina Deep Research
-- ✓ Alle 32 Tests bestanden (24 + 8 Auth-Tests)
+- ✓ Telegram-Authentifizierung mit Allowlist
+- ✓ GLM-4.7 Sprachmodell via glmproxy.ccpn.cc
+- ✓ Markdown-Gedächtnis V1 (lokal)
+- ✓ Perplexity Sonar für schnelle Faktensuche
+- ✓ Jina Deep Research für ausführliche Analysen
+- ✓ TTS-kompatible Ausgaben
+- ✓ Tool-System mit automatischer Nutzung
+- ✓ Alle 32 Tests bestanden
+
+**✓ Memory 2.0 aktiviert!** Hierarchisches Gedächtnis-System mit intelligenter Archivierung läuft jetzt produktiv.
 
 Siehe [CHANGELOG.md](CHANGELOG.md) für Details.
 
@@ -90,8 +95,9 @@ Der Bot läuft dann und wartet auf Nachrichten in Telegram.
 - `/start` - Bot starten und begrüßen
 - `/reset` - Gedächtnis zurücksetzen
 - `/help` - Hilfe anzeigen
-- `/search <Anfrage>` - Internet-Suche mit TTS-Output
-- `/searchmd <Anfrage>` - Internet-Suche mit Markdown-Datei
+- `/search <Anfrage>` - Schnelle Faktensuche mit Perplexity (TTS-optimiert)
+- `/searchmd <Anfrage>` - Suche mit vollständigem Markdown als Download
+- `/deepresearch <Anfrage>` - Ausführliche Analyse mit Jina Deep Research
 - Textnachrichten werden an das LLM gesendet mit automatischer Tool-Nutzung
 
 ## Funktionen
@@ -114,10 +120,11 @@ Mir geht es gut, danke der Nachfrage!
 
 Der Bot kann automatisch im Internet suchen wenn benötigt:
 
-- Erkennt automatisch Suchanfragen
-- Nutzt Jina Deep Research für umfassende Recherche
+- **Perplexity Sonar**: Schnelle Faktensuche (TV-Programm, Nachrichten, aktuelle Daten)
+- **Jina Deep Research**: Ausführliche Analysen (technische Erklärungen, Vergleiche)
+- Intelligente Auswahl basierend auf Anfrage-Keywords
 - TTS-optimierte Ausgabe für Sprachsynthese
-- Optional: Vollständiges Markdown als Download
+- Optional: Vollständiges Markdown als Download via /searchmd
 
 ### Tool-System
 
@@ -185,12 +192,21 @@ pytest tests/test_auth.py -v
 - Freundliche Ablehnung nicht-autorisierter User
 - Logging von Zugriffsversuchen
 
-### Geplant
+✓ **Input-Validierung**
+- Telegram-Limit (4096 Zeichen) wird respektiert
+- Sichere Dateinamen-Generierung
+- TTS-kompatible Formatierung
 
-- **Relative Pfade**: Keine hardcodierten Pfade
-- **Input-Validierung**: Strikte Prüfung aller Eingaben
+✓ **Token-Sicherheit**
+- .env in .gitignore
+- Keine API-Keys im Code
+- Alle Secrets über Umgebungsvariablen
+
+### Optional (für zukünftige Erweiterungen)
+
+- **Relative Pfade**: DATA_DIR aus .env nutzen
 - **Rate Limiting**: Schutz vor API-Missbrauch
-- **Dependencies Update**: Aktuelle Versionen
+- **Memory 2.0**: Hierarchisches Gedächtnis-System (Implementierung vorhanden, noch nicht aktiviert)
 
 ### Best Practices
 

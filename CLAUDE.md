@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Crowdbot ist ein funktionsfähiger KI-Assistent als sicherere Alternative zu Moltbot. Ein persönlicher Telegram-Bot der lokal betrieben wird und sensible Daten nicht an externe Cloud-Dienste sendet.
 
-**Status:** Produktiv einsetzbar (Version 1.0, Stand: 30. Januar 2026)
+**Status:** Produktiv einsetzbar mit Memory 2.0 (Version 1.1, Stand: 30. Januar 2026)
 
 Der Bot ist voll funktionsfähig mit Telegram-Integration, Perplexity-Suche für Fakten, Jina Deep Research für Analysen und GLM-4.7 als Sprachmodell.
+
+**Memory 2.0:** ✓ AKTIVIERT! Hierarchisches Gedächtnis-System läuft produktiv seit 30.01.2026 19:35 Uhr.
 
 ## Architektur
 
@@ -34,10 +36,22 @@ Das System besteht aus drei Hauptkomponenten:
 - `.gitignore` für `.env`, `__pycache__`, `/data`
 - Virtuelle Python-Umgebung aktiv
 
-✓ **Phase 2: Markdown-Gedächtnis** - ABGESCHLOSSEN
+✓ **Phase 2: Markdown-Gedächtnis V1** - ABGESCHLOSSEN
 - Pro User: `/data/users/{user_id}/memory.md`
 - Memory Manager mit `append_message()`, `get_context()`, `reset_user()`
 - Format: Markdown-Header mit Zeitstempeln
+
+✓ **Phase 8: Memory 2.0 System** - VOLLSTÄNDIG AKTIVIERT (30.01.2026 19:35 Uhr)
+- Hierarchisches Memory-System inspiriert von Moltbot
+- Dateistruktur: memory.md (Index), daily/, weekly/, monthly/, archive/, important/
+- LLM-basierte intelligente Bereinigung (Häufigkeit + Recency + Semantik)
+- Progressive Verdichtung: Soft Trim → Summarization → Archivierung
+- Dual-Trigger: Zeit-basiert UND größen-basiert
+- Kompression nach 90 Tagen für Archiv-Dateien
+- **Status:** ✓ Vollständig implementiert und aktiviert
+- **Migration:** ✓ User 7043093505 erfolgreich von V1 zu V2 migriert (38 Konversationen)
+- **Bot:** ✓ Läuft jetzt mit MemoryManagerV2
+- Details: [Context/MemoryStrategy.md](Context/MemoryStrategy.md)
 
 ✓ **Phase 3: LLM-Anbindung** - ABGESCHLOSSEN
 - GLM-4.7 via glmproxy.ccpn.cc (Anthropic API Format)
@@ -232,4 +246,5 @@ Keywords für Deep Research: "erkläre ausführlich", "analysiere", "wie funktio
 - **Context/CrowdBotDescription.md**: Projektspezifikation
 - **Context/SecurityImplementation.md**: Sicherheitsdetails
 - **Context/MoltBotSecurity.md**: Ursprüngliche Sicherheitsanalyse
+- **Context/MemoryStrategy.md**: Memory 2.0 Architektur und Implementierungsdetails
 - **.plan**: Aktueller Implementierungsstatus

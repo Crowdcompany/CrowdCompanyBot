@@ -1,0 +1,2 @@
+Für ausgiebige Recherchen haben wir hier einen Proxy für den kein API Key benötigt wird. Den kannst du sowohl für die eigenen Recherchen während der Entwicklung benötigen und benutzen, als ihn auch in die Crowdboard Logik mit einbauen, damit der Bot, den wir hier bauen, auch in der Lage ist, eine ausgiebige und tiefgreifende Recherche mit Quellen durchzuführen.
+https://jinaproxy.ccpn.cc/

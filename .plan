@@ -37,10 +37,73 @@ LLM Interface (GLM-4.7 via glmproxy.ccpn.cc)
 - [x] Virtuelle Python-Umgebung
 - [x] `requirements.txt`
 
-### Phase 2: Markdown-Gedächtnis
+### Phase 2: Markdown-Gedächtnis V1
 - [x] Pro User: `/data/users/{user_id}/memory.md`
 - [x] `memory_manager.py` mit append_message() und get_context()
 - [x] Format: Markdown-Header für User/Bot-Nachrichten
+
+### Phase 8: Memory 2.0 - Hierarchisches Gedächtnis-System (GEPLANT)
+
+**Ziel:** Intelligentes Memory-Management basierend auf Moltbot-Analyse
+
+**Architektur:**
+- [x] Strategie-Analyse von Moltbot abgeschlossen (30.01.2026)
+- [x] Dateistruktur implementieren:
+  - memory.md: Master Index mit Inhaltsverzeichnis
+  - daily/: Tagesdateien (YYYYMMDD.md)
+  - weekly/: Wochenzusammenfassungen (YYYY-WXX.md)
+  - monthly/: Monatszusammenfassungen (YYYY-MM.md)
+  - archive/: Komprimierte alte Dateien (.md.gz nach 90 Tagen)
+  - important/: Persistente Präferenzen (preferences.md)
+
+**Bereinigungslogik:**
+- [ ] Cronjob für automatische Bereinigung (4 Uhr nachts)
+- [ ] LLM-basierte Wichtigkeits-Bewertung:
+  - Häufigkeit: Wie oft erwähnt (0-3 Punkte)
+  - Recency: Wie kürzlich (0-2 Punkte)
+  - Explizite Wichtigkeit: "Merke dir", "wichtig" (0-2 Punkte)
+  - Persönliche Relevanz: Präferenzen, Abneigungen (0-3 Punkte)
+  - Score 8-10: Persistent in memory.md
+  - Score 5-7: Wochen-/Monatszusammenfassungen
+  - Score 2-4: Nach 7 Tagen archivieren
+  - Score 0-1: Nach 24h entfernen (TV-Programm, Wetter)
+
+**Progressive Verdichtung (inspiriert von Moltbot):**
+- [ ] T+1 Tag: Soft Trim (Details entfernen, Zusammenfassungen behalten)
+- [ ] T+7 Tage: Weekly Summary via LLM, Original → Archive
+- [ ] T+30 Tage: Monthly Summary, Wochen → Archive
+- [ ] T+365 Tage: Yearly Summary, nur Essentials in memory.md
+- [ ] T+90 Tage: Archiv-Kompression (.md.gz)
+
+**Dual-Trigger-System:**
+- [ ] Zeit-basiert: Nach X Tagen bereinigen
+- [ ] Größen-basiert: Bei > 5MB Dateigröße triggen
+
+**Schutzmaßnahmen:**
+- [ ] Letzte 7 Tage nie automatisch bereinigen
+- [ ] important/preferences.md nie bereinigen
+- [ ] Benutzer-Fragen immer behalten
+- [ ] Projektentscheidungen markieren und schützen
+
+**Kontextladen-Strategie:**
+- [ ] Standard: memory.md + letzte 3 Tagesdateien + preferences.md
+- [ ] LLM-Analyse: Identifiziere relevante historische Dateien
+- [ ] Token-Limit: Max 50% Context Window für Memory
+- [ ] Bei Überschreitung: Älteste Dateien überspringen
+
+**Implementierung:**
+- [x] file_structure.py für Ordnerstruktur-Verwaltung (340 Zeilen)
+- [x] memory_manager_v2.py mit V2 Funktionen (550 Zeilen)
+- [x] importance_scorer.py für LLM-basierte Bewertung (420 Zeilen)
+- [x] summarizer.py für progressive Verdichtung (380 Zeilen)
+- [x] cleanup_service.py für Cronjob-Logik (450 Zeilen)
+- [x] context_loader.py für intelligentes Kontextladen (320 Zeilen)
+- [x] Tests geschrieben (12 Tests in test_memory_v2.py)
+
+**Dokumentation:**
+- [x] Context/MemoryStrategy.md mit vollständiger Architektur
+- [ ] README.md aktualisieren
+- [ ] CHANGELOG.md: Version 2.0 Entry
 
 ### Phase 3: LLM Client
 - [x] GLM-4.7 via glmproxy.ccpn.cc (Anthropic Format)
@@ -252,15 +315,15 @@ class RateLimiter:
         self.requests = {}  # {user_id: [timestamps]}
 ```
 
-## Nächste Schritte (Phase 8+)
+## Nächste Schritte (Phase 9+)
 
 ### Zukünftige Erweiterungen (optional):
-- Phase 8: Relative Pfade und DATA_DIR Konfiguration
-- Phase 9: Rate Limiting implementieren
-- Phase 10: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
-- Phase 11: Dashboard und Monitoring
-- Phase 12: Multi-Bot-Support
-- Phase 13: Deploy als Docker-Container
+- Phase 9: Relative Pfade und DATA_DIR Konfiguration
+- Phase 10: Rate Limiting implementieren
+- Phase 11: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
+- Phase 12: Dashboard und Monitoring
+- Phase 13: Multi-Bot-Support
+- Phase 14: Deploy als Docker-Container
 
 ## Status (Stand: 30. Januar 2026)
 
@@ -270,7 +333,7 @@ Der Crowdbot ist voll funktionsfähig mit:
 - ✓ GLM-4.7 Sprachmodell (via glmproxy.ccpn.cc)
 - ✓ Perplexity Sonar für schnelle Faktensuche
 - ✓ Jina Deep Research für ausführliche Analysen
-- ✓ Markdown-basiertes Gedächtnis (lokal)
+- ✓ Markdown-basiertes Gedächtnis V1 (lokal, einfache Dateistruktur)
 - ✓ Telegram User-Authentifizierung (Allowlist)
 - ✓ TTS-kompatible Ausgaben
 - ✓ Tool-System mit automatischer Nutzung
@@ -278,4 +341,32 @@ Der Crowdbot ist voll funktionsfähig mit:
 
 **Letzte Implementierung:** Phase 7 - Sicherheits-Härtung (abgeschlossen)
 
-Der Bot ist produktionsbereit und kann auf Telegram genutzt werden.
+**Aktueller Stand:** Phase 8 - Memory 2.0 VOLLSTÄNDIG AKTIVIERT (30.01.2026 19:35 Uhr)
+
+**Dokumentation aktualisiert:** 30. Januar 2026
+- README.md zeigt aktuellen Stand und verfügbare Features
+- CHANGELOG.md dokumentiert Version 1.0 Release und Memory 2.0 Aktivierung
+- CLAUDE.md enthält vollständige Entwickler-Anweisungen
+- Context/MemoryStrategy.md beschreibt Memory 2.0 Architektur
+
+Implementierte und AKTIVIERTE Memory 2.0 Komponenten:
+- ✓ FileStructureManager: Hierarchische Ordnerstruktur, Archivierung, Kompression
+- ✓ MemoryManagerV2: Rückwärtskompatibel, Tagesdateien, V1→V2 Migration
+- ✓ ImportanceScorer: LLM-basierte Bewertung (0-10 Punkte), Fallback-Heuristiken
+- ✓ Summarizer: Soft Trim, Weekly/Monthly/Yearly Summaries
+- ✓ CleanupService: Automatische Bereinigung, Dual-Trigger, Emergency Cleanup
+- ✓ ContextLoader: Intelligentes Laden, LLM-basierte Dateiauswahl
+- ✓ Tests: 12 umfassende Tests für alle Komponenten
+- ✓ migrate_v1_to_v2.py: Migrations-Skript erstellt und getestet
+
+Aktivierungsschritte abgeschlossen (30.01.2026):
+- ✓ bot.py auf MemoryManagerV2 umgestellt
+- ✓ Migration von V1 zu V2 für User 7043093505 durchgeführt
+- ✓ Hierarchische Ordnerstruktur angelegt
+- ✓ memory.md Index und preferences.md erstellt
+- ✓ 38 Konversationen erfolgreich migriert
+
+Optional für später:
+- Cronjob-Setup für automatischen Cleanup (manuell via cleanup_service.py möglich)
+
+Der Bot läuft jetzt mit Memory 2.0!
