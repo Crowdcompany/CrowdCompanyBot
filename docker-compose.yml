@@ -16,9 +16,12 @@ services:
       - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
       - DATA_DIR=/app/data
 
-    # Persistentes Volume für User-Daten (Host-Path für Coolify)
+    # Persistentes Volume für User-Daten
+    # WICHTIG: In Coolify UI muss ein Persistent Volume konfiguriert werden:
+    # Name: crowdbot-data
+    # Mount Path: /app/data
     volumes:
-      - ./data:/app/data
+      - crowdbot-data:/app/data
 
     # Ressourcen-Limits (optional)
     deploy:
@@ -45,5 +48,7 @@ services:
       retries: 3
       start_period: 10s
 
-# Volumes werden als Host-Paths gemountet (siehe services.crowdbot.volumes)
-# Das ./data Verzeichnis bleibt nach Redeployments erhalten
+volumes:
+  crowdbot-data:
+    name: crowdbot-data
+    external: true
