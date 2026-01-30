@@ -149,6 +149,44 @@ class Crowdbot:
         else:
             return "Die Suche hat keine Ergebnisse geliefert."
 
+    def _load_important_files(self, user_id: int) -> str:
+        """
+        Lädt alle important/*.md Dateien für den Kontext.
+
+        Args:
+            user_id: Telegram Benutzer-ID
+
+        Returns:
+            Kombinierter Inhalt aller important-Dateien als String
+        """
+        from pathlib import Path
+
+        important_dir = Path(self.memory_manager.data_dir) / "users" / str(user_id) / "important"
+
+        if not important_dir.exists():
+            return ""
+
+        important_content = []
+        important_content.append("# Wichtige Informationen (dauerhaft gespeichert)")
+        important_content.append("")
+
+        # Alle .md Dateien in important/ laden
+        for md_file in sorted(important_dir.glob("*.md")):
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                important_content.append(f"## Aus Datei: {md_file.name}")
+                important_content.append(content)
+                important_content.append("")
+                logger.debug(f"Important-Datei geladen: {md_file.name} ({len(content)} Zeichen)")
+            except Exception as e:
+                logger.error(f"Fehler beim Laden von {md_file.name}: {e}")
+                continue
+
+        if len(important_content) > 2:  # Mehr als nur Header
+            return "\n".join(important_content)
+        else:
+            return ""
+
     def _remove_markdown(self, text: str) -> str:
         """
         Entfernt alle Markdown-Formatierungen aus dem Text für TTS-Kompatibilität.
@@ -608,9 +646,17 @@ class Crowdbot:
         # Konversations-Kontext laden
         conversation_history = self.memory_manager.get_context(user_id, max_messages=10)
 
+        # Important-Dateien laden (importierte Webseiten, Präferenzen)
+        important_context = self._load_important_files(user_id)
+
+        # Erweitere user_message mit wichtigem Kontext
+        enhanced_user_message = user_message
+        if important_context:
+            enhanced_user_message = f"[Wichtiger Kontext aus deinem Gedächtnis:]\n{important_context}\n\n[Benutzer-Anfrage:]\n{user_message}"
+
         # Anfrage an das LLM senden mit Intention-basierter Tool-Nutzung
         response = self.llm_client.chat_with_intention(
-            user_message=user_message,
+            user_message=enhanced_user_message,
             conversation_history=conversation_history,
             max_tokens=2000
         )
