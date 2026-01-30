@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  crowdbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crowdbot:latest
+    container_name: crowdbot
+    restart: unless-stopped
+
+    # Umgebungsvariablen (werden von Coolify überschrieben)
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ALLOWED_USER_IDS=${ALLOWED_USER_IDS}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-10}
+      - DATA_DIR=/app/data
+
+    # Persistentes Volume für User-Daten
+    volumes:
+      - bot_data:/app/data
+
+    # Ressourcen-Limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Health Check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "python.*src.bot"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  bot_data:
+    driver: local

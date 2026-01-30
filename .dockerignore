@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Daten und Logs
+data/
+*.log
+bot.log
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# Environment
+.env
+.env.local
+
+# Tests
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Dokumentation (optional - kann auch ins Image)
+# README.md
+# CHANGELOG.md
+
+# Lokale Entwicklung
+moltbot/
+test_import.py
+
+# MacOS
+.DS_Store
