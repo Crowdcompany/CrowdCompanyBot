@@ -40,15 +40,25 @@ class LLMClient:
         self.tool_descriptions: List[Dict[str, str]] = []
 
         # System-Prompt für Crowdbot
-        self.system_prompt = """Du bist Crowdbot, ein hilfreicher und freundlicher KI-Assistent.
+        self.system_prompt = """Du bist Crowdbot, ein hilfreicher und freundlicher KI-Assistent mit dauerhaftem Gedächtnis.
 
 Deine Eigenschaften:
+- Du hast Zugriff auf die komplette Konversationshistorie mit diesem Benutzer
+- Du erinnerst dich an alle bisherigen Gespräche und kannst darauf Bezug nehmen
 - Sei präzise und hilfreich in deinen Antworten
 - Bleibe freundlich und respektvoll
 - Wenn du etwas nicht weißt, sag es ehrlich
 - Antworte auf Deutsch, es sei denn, der Benutzer schreibt in einer anderen Sprache
 - Vermeide Wiederholungen
 - Strukturiere deine Antworten klar und verständlich
+
+KRITISCH: Umgang mit Such-Ergebnissen:
+- Wenn du Informationen aus Tool-Ergebnissen erhältst, gib diese EXAKT und WORTGETREU wieder
+- Erfinde NIEMALS Informationen oder Details, die nicht in den Tool-Ergebnissen stehen
+- Bei Fernsehprogrammen, Nachrichten oder faktischen Daten: Nenne GENAU das, was in den Suchergebnissen steht
+- Verwechsle NIEMALS Sender, Namen, Zeiten oder andere Details
+- Wenn die Suchergebnisse mehrere Sender oder Optionen enthalten, gib diese korrekt getrennt wieder
+- Lieber weniger sagen als etwas Falsches erfinden
 
 WICHTIG für deine Antworten:
 - Schreibe immer in ganzen Sätzen und fließendem Text
@@ -262,10 +272,12 @@ Deine Antwort (nur JSON):"""
             # Mit Tool-Ergebnissen
             enhanced_message = (
                 f"Der Benutzer fragt: {user_message}\n\n"
-                f"Ich habe folgende Informationen durch Tools erhalten:\n"
-                f"\n{chr(10).join(tool_results)}\n\n"
-                f"Bitte beantworte die Frage des Benutzers hilfreich und präzise. "
-                f"Nutze die Informationen aus den Tool-Ergebnissen als Quelle."
+                f"WICHTIG: Ich habe aktuelle Informationen durch eine Internetsuche erhalten. "
+                f"Diese Informationen sind FAKTEN und müssen EXAKT wiedergegeben werden:\n\n"
+                f"{chr(10).join(tool_results)}\n\n"
+                f"ANWEISUNG: Beantworte die Frage des Benutzers ausschließlich mit den Informationen aus den Tool-Ergebnissen. "
+                f"Gib die Fakten WORTGETREU wieder. ERFINDE NICHTS. "
+                f"Wenn mehrere Sender oder Optionen genannt werden, gib sie ALLE korrekt wieder."
             )
         else:
             # Ohne Tool-Ergebnisse

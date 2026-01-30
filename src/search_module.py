@@ -17,17 +17,20 @@ class SearchModule:
     def __init__(
         self,
         jina_reader_url: str = "https://r.jina.ai",
-        jina_proxy_url: str = "https://jinaproxy.ccpn.cc"
+        jina_proxy_url: str = "https://jinaproxy.ccpn.cc",
+        perplexity_proxy_url: str = "https://ppproxy.ccpn.cc"
     ):
         """
         Initialisiert das Search Module.
 
         Args:
             jina_reader_url: URL für Jina Reader
-            jina_proxy_url: URL für Jina Deep Search Proxy
+            jina_proxy_url: URL für Jina Deep Search Proxy (für ausführliche Analysen)
+            perplexity_proxy_url: URL für Perplexity Proxy (für schnelle Fakten-Suchen)
         """
         self.jina_reader_url = jina_reader_url
         self.jina_proxy_url = jina_proxy_url
+        self.perplexity_proxy_url = perplexity_proxy_url
 
     def is_url(self, text: str) -> bool:
         """
@@ -78,6 +81,63 @@ class SearchModule:
         except Exception as e:
             return f"Fehler: {e}"
 
+    def perplexity_search(
+        self,
+        query: str,
+        max_tokens: int = 2000
+    ) -> Optional[str]:
+        """
+        Führt eine schnelle Fakten-Suche mit Perplexity durch.
+
+        Ideal für: Aktuelle Nachrichten, TV-Programme, schnelle Fakten,
+        "Was ist X?"-Fragen - alles was man auch in Google suchen würde.
+
+        Args:
+            query: Die Suchanfrage
+            max_tokens: Maximale Token in der Antwort
+
+        Returns:
+            Die Suchergebnisse mit Quellenangaben oder None bei Fehler
+        """
+        try:
+            url = f"{self.perplexity_proxy_url}/chat/completions"
+
+            payload = {
+                "model": "sonar",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ],
+                "max_tokens": max_tokens
+            }
+
+            response = requests.post(url, json=payload, timeout=30)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get("choices") and len(data["choices"]) > 0:
+                    content = data["choices"][0].get("message", {}).get("content")
+
+                    # Optional: Quellenangaben anhängen wenn verfügbar
+                    citations = data.get("citations", [])
+                    if citations and len(citations) > 0:
+                        # Füge Quellen hinzu (maximal 3 für TTS)
+                        sources = "\n\nQuellen: " + ", ".join(citations[:3])
+                        content += sources
+
+                    return content
+                else:
+                    return "Keine Ergebnisse erhalten"
+
+            else:
+                return f"Fehler: HTTP {response.status_code}"
+
+        except Exception as e:
+            return f"Fehler: {e}"
+
     def deep_search(
         self,
         query: str,
@@ -85,7 +145,10 @@ class SearchModule:
         max_tokens: int = 4000
     ) -> Optional[str]:
         """
-        Führt eine Deep Research mit dem Jina-Proxy durch.
+        Führt eine ausführliche Deep Research mit dem Jina-Proxy durch.
+
+        Ideal für: Tiefgehende Analysen, Wikipedia-ähnliche Recherchen,
+        komplexe Themen die detaillierte Erklärungen brauchen.
 
         Args:
             query: Die Suchanfrage
@@ -221,18 +284,52 @@ class SearchModule:
 
         return result.strip()
 
+    def _needs_deep_research(self, query: str) -> bool:
+        """
+        Entscheidet ob Deep Research (Jina) oder schnelle Suche (Perplexity) benötigt wird.
+
+        Deep Research für: Ausführliche Analysen, Wikipedia-ähnliche Recherchen
+        Perplexity für: Schnelle Fakten, Nachrichten, TV-Programme, "Was ist X?"
+
+        Args:
+            query: Die Suchanfrage
+
+        Returns:
+            True wenn Deep Research benötigt wird
+        """
+        query_lower = query.lower()
+
+        # Keywords für Deep Research
+        deep_keywords = [
+            'erkläre ausführlich', 'erkläre detailliert', 'analysiere',
+            'vergleiche detailliert', 'geschichte von', 'hintergrund',
+            'tiefgehend', 'umfassend', 'detailliert',
+            'wie funktioniert', 'wissenschaftlich', 'technisch erklärt'
+        ]
+
+        # Wenn Deep Research Keywords vorhanden sind
+        if any(keyword in query_lower for keyword in deep_keywords):
+            return True
+
+        # Standardmäßig Perplexity für schnelle Fakten-Suche
+        return False
+
     def search(
         self,
         query: str,
-        use_deep_search: bool = True,
+        force_deep_search: bool = False,
         format: str = "tts"
     ) -> Optional[str]:
         """
         Sucht im Internet basierend auf der Anfrage.
 
+        Nutzt intelligente Erkennung:
+        - Perplexity (sonar) für schnelle Fakten, Nachrichten, TV-Programme
+        - Deep Research (Jina) für ausführliche Analysen und komplexe Themen
+
         Args:
             query: Die Suchanfrage oder URL
-            use_deep_search: True für Deep Research, False für einzelnen URL-Fetch
+            force_deep_search: Erzwingt Deep Research statt Perplexity
             format: "tts" fuer TTS-kompatiblen Text, "markdown" fuer rohes Markdown
 
         Returns:
@@ -242,11 +339,13 @@ class SearchModule:
         if self.is_url(query):
             raw_result = self.fetch_url(query)
         else:
-            # Deep Research
-            if use_deep_search:
+            # Intelligente Auswahl zwischen Perplexity und Deep Research
+            if force_deep_search or self._needs_deep_research(query):
+                print(f"Nutze Deep Research (Jina) für: {query}")
                 raw_result = self.deep_search(query)
             else:
-                return "Deep Research ist deaktiviert"
+                print(f"Nutze Perplexity für: {query}")
+                raw_result = self.perplexity_search(query)
 
         # Formatierung anwenden
         if raw_result and format == "tts":

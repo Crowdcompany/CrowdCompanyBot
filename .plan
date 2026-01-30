@@ -1,0 +1,281 @@
+# Crowdbot - Implementierungsplan
+
+## Projektziel
+
+Crowdbot ist ein selbst gehosteter KI-Assistent als sichere Alternative zu Moltbot mit folgenden Kernmerkmalen:
+
+- Datensouveränität: Sensible Daten bleiben lokal
+- Sicherheit: Kein Standard-Port, DM Pairing, Isolation, Allowlists
+- Kosteneffizienz: GLM-4 via Proxy statt teurer Cloud-APIs
+- Transparenz: Markdown-basiertes Gedächtnis
+
+## Architektur
+
+```
+Telegram Bot (python-telegram-bot)
+         ↓
+Python Backend (Orchestrator, Memory Manager, Search Module)
+         ↓
+LLM Interface (GLM-4.7 via glmproxy.ccpn.cc)
+```
+
+## Tech-Stack
+
+- Sprache: Python 3.11+ (mit virtueller Umgebung)
+- LLM: GLM-4.7 via glmproxy.ccpn.cc (Anthropic Format)
+- Messaging: Telegram Bot API (python-telegram-bot 21.11)
+- Faktensuche: Perplexity Sonar via ppproxy.ccpn.cc
+- Deep Research: Jina Deep Search via jinaproxy.ccpn.cc
+- Web Scraping: Jina Reader (r.jina.ai)
+- Gedächtnis: Markdown-Dateien (lokal)
+
+## Implementierungsstatus
+
+### Phase 1: Projekt-Setup
+- [x] Ordnerstruktur: `/src`, `/data`, `/tests`
+- [x] `.gitignore` für `.env`, `__pycache__`, `/data`
+- [x] Virtuelle Python-Umgebung
+- [x] `requirements.txt`
+
+### Phase 2: Markdown-Gedächtnis
+- [x] Pro User: `/data/users/{user_id}/memory.md`
+- [x] `memory_manager.py` mit append_message() und get_context()
+- [x] Format: Markdown-Header für User/Bot-Nachrichten
+
+### Phase 3: LLM Client
+- [x] GLM-4.7 via glmproxy.ccpn.cc (Anthropic Format)
+- [x] System-Prompt für Crowdbot mit TTS-Anweisungen
+- [x] Tool-System implementiert (Tool-Registrierung)
+- [x] Intention-basierte Tool-Nutzung
+- [x] Test-Call erfolgreich
+
+### Phase 4: Telegram Integration
+- [x] `bot.py` mit Handler-Struktur
+- [x] /start, /reset, /help Handler
+- [x] /search Handler (Perplexity für Fakten)
+- [x] /searchmd Handler (mit Markdown-Datei Download)
+- [x] /deepresearch Handler (Jina für Analysen)
+- [x] Text-Handler mit Memory-Integration
+- [x] Typing-Indikator während Verarbeitung
+
+### Phase 5: Testing
+- [x] Unit-Tests für Memory Manager (6 Tests)
+- [x] Unit-Tests für LLM Client (5 Tests)
+- [x] Unit-Tests für Search Module (9 Tests)
+- [x] Integrationstests (4 Tests)
+- [x] Authentifizierungstests (8 Tests)
+- [x] Alle 32 Tests bestanden
+
+### Phase 6: Internet-Suche (ERWEITERT)
+- [x] `search_module.py` mit drei Such-Modi:
+  - Perplexity Sonar für schnelle Fakten
+  - Jina Deep Research für Analysen
+  - Jina Reader für einzelne URLs
+- [x] Intelligente Auswahl basierend auf Keywords
+- [x] TTS-kompatible Formatierung (_make_tts_compatible)
+- [x] Markdown-Format für Downloads
+- [x] Tool-Integration im LLM Client
+
+## Funktionsumfang
+
+- **/start**: Erstellt User-Ordner mit memory.md, begrüßt User
+- **/reset**: Setzt Gedächtnis zurück, erstellt neue memory.md
+- **/help**: Zeigt Hilfe zu allen Befehlen und Funktionen
+- **/search <Anfrage>**: Schnelle Faktensuche mit Perplexity (TTS-optimiert)
+- **/searchmd <Anfrage>**: Suche mit vollständigem Markdown als Download
+- **/deepresearch <Anfrage>**: Ausführliche Analyse mit Jina Deep Research
+- **Textnachrichten**: Chat mit LLM, automatische Tool-Nutzung, Gedächtnis-Integration
+- **Kontext**: Lädt letzte 10 Nachrichten aus memory.md für Konversationskontext
+
+## API-Konfiguration
+
+### GLM-4.7 Proxy
+- URL: https://glmproxy.ccpn.cc/v1/messages
+- Format: Anthropic API
+- Modell: glm-4.7
+- Kein API-Key erforderlich
+
+### Perplexity Proxy (Faktensuche)
+- URL: https://ppproxy.ccpn.cc/chat/completions
+- Format: OpenAI-kompatibel
+- Modell: sonar
+- Verwendung: Nachrichten, TV-Programme, schnelle Fakten
+- Kein API-Key erforderlich
+
+### Jina Deep Search
+- URL: https://jinaproxy.ccpn.cc/v1/chat/completions
+- Format: OpenAI-kompatibel
+- Modell: jina-deepsearch-v1
+- Verwendung: Ausführliche Analysen, Wikipedia-ähnlich
+- Kein API-Key erforderlich
+
+### Jina Reader
+- URL: https://r.jina.ai/
+- Verwendung: Einzelne URLs scrapen
+- Kein API-Key erforderlich
+
+### Telegram
+- Bot-Token vom @BotFather erforderlich
+- User Chat-IDs von @userinfobot oder @get_id_bot
+- In .env speichern als TELEGRAM_BOT_TOKEN und ALLOWED_USER_IDS
+
+## Sicherheitsanforderungen
+
+1. Kein Standard-Port
+2. Isolation in VM oder Docker
+3. Input Sanitization gegen Markdown-Injections
+4. Token-Sicherheit: .env niemals committen
+
+## Antwortformate
+
+### Chat-Antworten
+- Alle Chat-Antworten müssen TTS-kompatibel sein (Text-to-Speech)
+- Kein Markdown im Chat (keine Sternchen, Unterstriche, Backticks, etc.)
+- Fließender Text in ganzen Sätzen
+- Keine Sonderzeichen die von TTS vorgelesen werden (wie *, _, =, etc.)
+
+### Markdown-Antworten
+- Markdown nur als herunterladbare Datei
+- Vollständiges Formatierung erhältlich
+- Nur über expliziten Befehl (/searchmd)
+
+## Dateistruktur
+
+```
+Crowdbot/
+├── .env                    # API Keys (NICHT im Git)
+├── .env.example            # Beispiel-Konfiguration
+├── .gitignore              # Sensible Dateien ausschließen
+├── .plan                   # Dieser Plan
+├── requirements.txt        # Python-Abhängigkeiten
+├── README.md              # Dokumentation
+├── venv/                  # Virtuelle Umgebung
+├── src/
+│   ├── __init__.py
+│   ├── bot.py             # Telegram Bot Main
+│   ├── memory_manager.py  # Gedächtnis-Verwaltung
+│   ├── llm_client.py      # GLM-4 API Client
+│   └── search_module.py   # Jina Suche
+├── data/
+│   └── users/
+│       └── {user_id}/
+│           └── memory.md  # Konversationsverlauf
+└── tests/
+    ├── test_memory.py     # Unit-Tests (6 Tests)
+    ├── test_llm_client.py # Unit-Tests (5 Tests)
+    ├── test_search.py     # Unit-Tests (9 Tests)
+    └── test_integration.py # Integrationstests (3 Tests)
+```
+
+## Phase 7: Sicherheits-Härtung ✓ ABGESCHLOSSEN
+
+Nach dem Sicherheitsaudit wurden kritische Sicherheitsfeatures implementiert:
+
+### 7.1 Telegram-Authentifizierung ✓ ABGESCHLOSSEN
+- [x] User-Allowlist implementiert in `src/bot.py`
+- [x] ALLOWED_USER_IDS aus .env geladen
+- [x] Komma-separierte Liste von Chat-IDs
+- [x] Prüfung bei allen Handler-Funktionen (6 Handler)
+- [x] `is_authorized()` und `check_authorization()` Funktionen
+- [x] Freundliche Ablehnung für nicht-autorisierte User
+- [x] Logging von unauthorisierten Zugriffsversuchen
+- [x] Tests geschrieben (8 Tests, alle bestanden)
+
+### 7.2 Input-Validierung ✓ IMPLEMENTIERT
+- [x] Telegram-Limit (4096 Zeichen) wird respektiert
+- [x] Sichere Dateinamen-Generierung in `search_md_command()`
+- [x] Alphanumerische Validierung für Query-basierte Dateinamen
+- [x] Längen-Limitierung für Dateinamen (50 Zeichen)
+- [x] TTS-kompatible Formatierung entfernt problematische Zeichen
+
+### 7.3 Token-Sicherheit ✓ IMPLEMENTIERT
+- [x] .env in .gitignore
+- [x] Keine API-Keys im Code
+- [x] Alle Secrets über Umgebungsvariablen
+- [x] .env.example als Vorlage erstellt
+
+### 7.4 TTS-Kompatibilität ✓ IMPLEMENTIERT
+- [x] `_remove_markdown()` Funktion im Bot
+- [x] `_make_tts_compatible()` Funktion im Search Module
+- [x] Alle Bot-Antworten werden gefiltert
+- [x] Sonderzeichen-Ersetzung (=, +, |, etc.)
+- [x] Fließtext-Formatierung
+
+### Noch offen (optionale Erweiterungen):
+
+#### 7.5 Relative Pfade (Optional)
+- [ ] Hardcodierte Pfade durch DATA_DIR aus .env ersetzen
+- [ ] Standard: `./data` relativ zum Projektverzeichnis
+
+#### 7.6 Rate Limiting (Optional)
+- [ ] Rate Limiter Klasse implementieren
+- [ ] 10 Anfragen pro Minute pro User
+- [ ] RATE_LIMIT_PER_MINUTE in .env
+- [ ] Cooldown für Deep Search
+
+### Priorität 2 - Dependencies Update:
+
+- [ ] `requirements.txt` aktualisieren:
+  - requests auf >= 2.32.0
+  - aiohttp auf >= 3.10.0
+- [ ] `pip audit` ausführen
+
+### Priorität 3 - Geplant für später:
+
+- Logging-Sicherheit: Sensible Daten maskieren
+- Security-Tests: Automated Input-Validierung
+- Error Handling: Nur für authentifizierte User
+
+### Technische Details:
+
+**Umgebungsvariablen in .env:**
+```
+TELEGRAM_BOT_TOKEN=...
+ALLOWED_USER_IDS=YOUR_CHAT_ID
+RATE_LIMIT_PER_MINUTE=10
+DATA_DIR=./data
+```
+
+**Authentifizierungs-Logik:**
+```python
+def is_authorized(user_id: int) -> bool:
+    allowed_ids = os.getenv("ALLOWED_USER_IDS", "").split(",")
+    return str(user_id) in allowed_ids
+```
+
+**Rate Limiter:**
+```python
+class RateLimiter:
+    def __init__(self, max_requests: int, time_window: int = 60):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = {}  # {user_id: [timestamps]}
+```
+
+## Nächste Schritte (Phase 8+)
+
+### Zukünftige Erweiterungen (optional):
+- Phase 8: Relative Pfade und DATA_DIR Konfiguration
+- Phase 9: Rate Limiting implementieren
+- Phase 10: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
+- Phase 11: Dashboard und Monitoring
+- Phase 12: Multi-Bot-Support
+- Phase 13: Deploy als Docker-Container
+
+## Status (Stand: 30. Januar 2026)
+
+✓ **PRODUKTIV EINSETZBAR (Version 1.0)**
+
+Der Crowdbot ist voll funktionsfähig mit:
+- ✓ GLM-4.7 Sprachmodell (via glmproxy.ccpn.cc)
+- ✓ Perplexity Sonar für schnelle Faktensuche
+- ✓ Jina Deep Research für ausführliche Analysen
+- ✓ Markdown-basiertes Gedächtnis (lokal)
+- ✓ Telegram User-Authentifizierung (Allowlist)
+- ✓ TTS-kompatible Ausgaben
+- ✓ Tool-System mit automatischer Nutzung
+- ✓ Alle 32 Tests bestanden
+
+**Letzte Implementierung:** Phase 7 - Sicherheits-Härtung (abgeschlossen)
+
+Der Bot ist produktionsbereit und kann auf Telegram genutzt werden.

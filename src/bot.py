@@ -128,6 +128,7 @@ class Crowdbot:
         Tool-Funktion für die Websuche.
 
         Wird vom LLM aufgerufen, wenn eine Suche benötigt wird.
+        Nutzt intelligente Erkennung (Perplexity für Fakten, Deep Research für Analysen).
 
         Args:
             query: Die Suchanfrage
@@ -136,7 +137,7 @@ class Crowdbot:
             Die Suchergebnisse als TTS-kompatibler Text
         """
         logger.info(f"Web-Suche Tool aufgerufen mit: {query}")
-        result = self.search_module.search(query, use_deep_search=True, format="tts")
+        result = self.search_module.search(query, force_deep_search=False, format="tts")
 
         if result:
             # Ergebnis stark begrenzen um Telegram-Limit zu vermeiden
@@ -146,6 +147,57 @@ class Crowdbot:
         else:
             return "Die Suche hat keine Ergebnisse geliefert."
 
+    def _remove_markdown(self, text: str) -> str:
+        """
+        Entfernt alle Markdown-Formatierungen aus dem Text für TTS-Kompatibilität.
+
+        Args:
+            text: Text mit potentiellen Markdown-Formatierungen
+
+        Returns:
+            Text ohne Markdown-Formatierungen
+        """
+        import re
+
+        if not text:
+            return text
+
+        # Fett-Formatierungen entfernen: **text** und __text__
+        text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+
+        # Kursiv-Formatierungen entfernen: *text* und _text_
+        text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+
+        # Code-Formatierungen entfernen: `code` und ```code```
+        text = re.sub(r'```[^\n]*\n.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+
+        # Links entfernen: [text](url) -> text
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+
+        # Überschriften entfernen: ### Text -> Text
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+
+        # Listen-Marker entfernen aber Struktur beibehalten
+        text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
+
+        # Blockquotes entfernen: > text
+        text = re.sub(r'^\s*>\s+', '', text, flags=re.MULTILINE)
+
+        # Horizontale Linien entfernen: --- oder ***
+        text = re.sub(r'^[\-\*]{3,}\s*$', '', text, flags=re.MULTILINE)
+
+        # Mehrfache Leerzeichen reduzieren
+        text = re.sub(r'\s+', ' ', text)
+
+        # Mehrfache Zeilenumbrüche reduzieren
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+
+        return text.strip()
+
     def _register_handlers(self):
         """Registriert alle Command- und Message-Handler."""
         self.application.add_handler(CommandHandler("start", self.start_command))
@@ -153,6 +205,7 @@ class Crowdbot:
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("search", self.search_command))
         self.application.add_handler(CommandHandler("searchmd", self.search_md_command))
+        self.application.add_handler(CommandHandler("deepresearch", self.deep_research_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
@@ -225,16 +278,17 @@ class Crowdbot:
             "Befehle:\n"
             "/start - Starte den Bot oder begrüße dich\n"
             "/reset - Setze mein Gedächtnis zurück\n"
-            "/search <Anfrage> - Manuelle Suche im Internet mit TTS-kompatibler Ausgabe\n"
-            "/searchmd <Anfrage> - Manuelle Suche im Internet, erhält vollständiges Markdown als Datei\n"
+            "/search <Anfrage> - Schnelle Fakten-Suche (Perplexity)\n"
+            "/deepresearch <Anfrage> - Ausführliche Analyse (Jina Deep Research)\n"
+            "/searchmd <Anfrage> - Suche mit Markdown-Datei\n"
             "/help - Zeigt diese Hilfe an\n\n"
             "Über Crowdbot:\n"
             "Ich bin ein selbst gehosteter KI-Assistent. "
             "Unsere Unterhaltungen werden lokal gespeichert und ich merke mich an frühere Gespräche.\n\n"
             "Automatische Suche:\n"
             "Ich kann automatisch im Internet suchen, wenn du nach aktuellen Informationen fragst. "
-            "Dazu musst du keinen speziellen Befehl nutzen - ich erkenne selbst, wann eine Suche sinnvoll ist.\n\n"
-            "Für manuelle Suchen mit Datei-Download nutze /searchmd.\n\n"
+            "Ich nutze Perplexity für schnelle Fakten wie TV-Programm, Nachrichten oder allgemeine Fragen.\n"
+            "Für tiefgehende Analysen nutze /deepresearch.\n\n"
             "Schreib mir einfach eine Nachricht, um ins Gespräch zu kommen!"
         )
 
@@ -244,8 +298,8 @@ class Crowdbot:
         """
         Handler für den /search Befehl.
 
-        Sucht im Internet mit Jina Deep Research und liefert
-        TTS-kompatible Ergebnisse in ganzen Sätzen.
+        Sucht im Internet mit intelligenter Erkennung (Perplexity für Fakten)
+        und liefert TTS-kompatible Ergebnisse in ganzen Sätzen.
         """
         if not await self.check_authorization(update):
             return
@@ -257,7 +311,8 @@ class Crowdbot:
             await update.message.reply_text(
                 "Bitte gib eine Suchanfrage an!\n"
                 "Beispiel: /search Was ist Python?\n\n"
-                "Mit /searchmd kannst du das vollständige Markdown als Datei erhalten."
+                "Für ausführliche Analysen nutze /deepresearch\n"
+                "Für Markdown-Datei nutze /searchmd"
             )
             return
 
@@ -275,11 +330,10 @@ class Crowdbot:
 
         # Suchanfrage ausführen mit TTS-Formatierung
         await update.message.reply_text(
-            f"🔍 Suche nach: {query}\n\n"
-            "Dies kann 30-60 Sekunden dauern..."
+            f"🔍 Suche nach: {query}..."
         )
 
-        result = self.search_module.search(query, use_deep_search=True, format="tts")
+        result = self.search_module.search(query, force_deep_search=False, format="tts")
 
         if result:
             # Ergebnis kürzen, falls zu lang für Telegram
@@ -336,7 +390,7 @@ class Crowdbot:
             "Das Ergebnis wird als Datei gesendet..."
         )
 
-        result = self.search_module.search(query, use_deep_search=True, format="markdown")
+        result = self.search_module.search(query, force_deep_search=False, format="markdown")
 
         if result:
             import tempfile
@@ -392,6 +446,68 @@ class Crowdbot:
             )
             logger.error(f"Suche lieferte keine Ergebnisse für: {query}")
 
+    async def deep_research_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handler für den /deepresearch Befehl.
+
+        Führt eine ausführliche Deep Research mit Jina durch,
+        ideal für komplexe Analysen und Wikipedia-ähnliche Recherchen.
+        """
+        if not await self.check_authorization(update):
+            return
+
+        user_id = update.effective_user.id
+
+        # Prüfen, ob Suchanfrage vorhanden
+        if not context.args or len(context.args) == 0:
+            await update.message.reply_text(
+                "Bitte gib eine Suchanfrage an!\n"
+                "Beispiel: /deepresearch Erkläre ausführlich wie Quantencomputer funktionieren\n\n"
+                "Deep Research ist ideal für:\n"
+                "- Ausführliche Analysen\n"
+                "- Komplexe technische Themen\n"
+                "- Wikipedia-ähnliche Recherchen\n\n"
+                "Für schnelle Fakten nutze normale Nachrichten oder /search"
+            )
+            return
+
+        query = " ".join(context.args)
+
+        # Prüfen, ob Benutzer existiert
+        if not self.memory_manager.user_exists(user_id):
+            await update.message.reply_text(
+                "Bitte starte den Bot erst mit /start!"
+            )
+            return
+
+        # Typing-Indikator anzeigen
+        await update.message.chat.send_action("typing")
+
+        # Suchanfrage mit Deep Research erzwingen
+        await update.message.reply_text(
+            f"🔬 Starte ausführliche Deep Research für: {query}\n\n"
+            "Dies kann 60-120 Sekunden dauern..."
+        )
+
+        result = self.search_module.search(query, force_deep_search=True, format="tts")
+
+        if result:
+            # Ergebnis kürzen, falls zu lang für Telegram
+            if len(result) > 4000:
+                result = result[:4000] + "\n\n... (gekürzt wegen Länge)"
+
+            # Ergebnis speichern
+            self.memory_manager.append_message(user_id, "user", f"/deepresearch {query}")
+            self.memory_manager.append_message(user_id, "assistant", result)
+
+            await update.message.reply_text(result)
+        else:
+            await update.message.reply_text(
+                "Es tut mir leid, die Deep Research hat keine Ergebnisse geliefert. "
+                "Versuche es mit einer anderen Anfrage."
+            )
+            logger.error(f"Deep Research lieferte keine Ergebnisse für: {query}")
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Handler für Textnachrichten.
@@ -428,6 +544,9 @@ class Crowdbot:
         )
 
         if response:
+            # Markdown entfernen für TTS-Kompatibilität
+            response = self._remove_markdown(response)
+
             # Antwort für Telegram kürzen (Limit: 4096 Zeichen)
             TELEGRAM_LIMIT = 4000
 
