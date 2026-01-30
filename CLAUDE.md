@@ -94,7 +94,7 @@ Kritische Sicherheitsanforderungen basierend auf Sicherheitsaudit:
 
 1. **Telegram-Authentifizierung**: ✓ IMPLEMENTIERT (2026-01-30)
    - User-Allowlist mit autorisierten Chat-IDs
-   - Owner Chat-ID: 7043093505 in `.env` konfiguriert
+   - Owner Chat-ID: YOUR_CHAT_ID in `.env` konfiguriert
    - Weitere autorisierte User können hinzugefügt werden
    - Alle anderen User werden abgelehnt mit freundlicher Nachricht
    - 8 Tests implementiert und bestanden

@@ -32,7 +32,7 @@ Alle wichtigen Änderungen am Projekt werden hier dokumentiert.
      - `handle_message()` - Zeile 401
 
 4. **Konfiguration**
-   - [.env](.env) erweitert um ALLOWED_USER_IDS=7043093505
+   - [.env](.env) erweitert um ALLOWED_USER_IDS=YOUR_CHAT_ID
    - [.env.example](.env.example) mit Dokumentation und Beispiel
 
 5. **Tests**
@@ -52,7 +52,7 @@ Alle wichtigen Änderungen am Projekt werden hier dokumentiert.
 Um weitere User zu autorisieren, in [.env](.env) einfach weitere IDs hinzufügen:
 
 ```bash
-ALLOWED_USER_IDS=7043093505,1234567890,9876543210
+ALLOWED_USER_IDS=YOUR_CHAT_ID,1234567890,9876543210
 ```
 
 #### Chat-ID herausfinden
@@ -79,7 +79,7 @@ Empfohlene Bots (alle funktionieren):
 
 #### Verhalten
 
-**Autorisierter User (7043093505):**
+**Autorisierter User (YOUR_CHAT_ID):**
 - Alle Befehle funktionieren normal
 - Zugriff auf alle Bot-Funktionen
 - Nachrichten werden verarbeitet

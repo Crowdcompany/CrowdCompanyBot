@@ -59,7 +59,7 @@ Bearbeite `.env` und setze:
 TELEGRAM_BOT_TOKEN=dein_token_hier
 
 # Deine Chat-ID (von @userinfobot erhalten)
-ALLOWED_USER_IDS=7043093505
+ALLOWED_USER_IDS=YOUR_CHAT_ID
 
 # Optional: Rate Limiting anpassen
 RATE_LIMIT_PER_MINUTE=10
@@ -204,7 +204,7 @@ pytest tests/test_auth.py -v
 Um weitere User zu autorisieren, einfach deren Chat-ID in `.env` hinzufügen:
 
 ```bash
-ALLOWED_USER_IDS=7043093505,1234567890,9876543210
+ALLOWED_USER_IDS=YOUR_CHAT_ID,1234567890,9876543210
 ```
 
 Komma-separiert, ohne Leerzeichen.
