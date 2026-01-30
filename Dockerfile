@@ -21,6 +21,11 @@ LABEL maintainer="raimund.bauer@crowdcompany-ug.com"
 LABEL description="Crowdbot - Self-hosted Telegram AI Assistant with Memory 2.0"
 LABEL version="1.1.0"
 
+# Runtime-Abhängigkeiten für Healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root User erstellen
 RUN useradd -m -u 1000 -s /bin/bash botuser
 
