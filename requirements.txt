@@ -1,0 +1,15 @@
+# Telegram Bot
+python-telegram-bot==20.7
+
+# HTTP Requests
+requests==2.31.0
+
+# Umgebungsvariablen
+python-dotenv==1.0.0
+
+# Asynchrone Unterstützung
+aiohttp==3.9.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1

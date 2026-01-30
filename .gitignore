@@ -1,0 +1,33 @@
+# Umgebung und Abhängigkeiten
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Daten und Benutzergedächtnis
+/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
