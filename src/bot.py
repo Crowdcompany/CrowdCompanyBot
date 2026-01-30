@@ -63,16 +63,17 @@ class Crowdbot:
     def __init__(
         self,
         token: Optional[str] = None,
-        data_dir: str = "/media/xray/NEU/Code/Crowdbot/data"
+        data_dir: Optional[str] = None
     ):
         """
         Initialisiert den Crowdbot.
 
         Args:
             token: Telegram Bot Token (aus .env wenn None)
-            data_dir: Verzeichnis für Benutzerdaten
+            data_dir: Verzeichnis für Benutzerdaten (aus .env wenn None)
         """
         self.token = token or os.getenv("TELEGRAM_BOT_TOKEN")
+        data_dir = data_dir or os.getenv("DATA_DIR", "./data")
 
         if not self.token:
             raise ValueError(
