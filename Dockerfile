@@ -49,7 +49,7 @@ USER botuser
 
 # Health Check (prüft ob Bot-Prozess läuft)
 HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 \
-    CMD pgrep -f "python.*src.bot" || exit 1
+    CMD ps aux | grep -v grep | grep "python.*src.bot" || exit 1
 
 # Volume für persistente Daten
 VOLUME ["/app/data"]
