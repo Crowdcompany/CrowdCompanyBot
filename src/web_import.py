@@ -90,9 +90,9 @@ class WebImporter:
             Tuple von (success, content/error_message, title)
         """
         try:
-            # Validiere URL
+            # Füge https:// hinzu wenn kein Schema vorhanden
             if not url.startswith(('http://', 'https://')):
-                return False, "URL muss mit http:// oder https:// beginnen", None
+                url = 'https://' + url
 
             # Nutze Jina Reader für sauberen Markdown-Content
             jina_url = f"{self.jina_reader_url}{url}"
