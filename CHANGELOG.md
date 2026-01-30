@@ -2,6 +2,36 @@
 
 Alle wichtigen Änderungen am Projekt werden hier dokumentiert.
 
+## [Version 1.1 - Coolify Deployment & Security Audit] - 2026-01-30
+
+### Status: PRODUKTIV AUF COOLIFY
+
+**Deployment-Fixes:**
+- ✓ Docker Healthcheck repariert (ps-basiert statt pgrep)
+- ✓ Bot läuft erfolgreich auf Coolify
+- ✓ Non-root User (botuser) im Container
+- ✓ Volume für persistente Daten
+
+**Sicherheits-Audit durchgeführt:**
+- ✓ Authentifizierung: Sicher (User-Allowlist funktioniert)
+- ✓ Docker-Security: Best Practices befolgt
+- ✓ Secrets Management: Keine Secrets im Git
+- ✓ Input-Validierung: Gut geschützt
+- ⚠️ Dependencies: Veraltete Versionen mit CVEs (Update in Phase 9 geplant)
+- ✓ Daten-Privacy: Lokal gespeichert, keine Cloud-Uploads
+- ✓ Logging: Sicher, keine sensiblen Daten
+
+**Neue Phasen geplant:**
+- Phase 9: Dependencies aktualisieren (KRITISCH)
+- Phase 10: .env Permissions korrigieren (KRITISCH)
+- Phase 11: Prompt Injection Defense (Empfohlen)
+- Phase 12: Rate Limiting (Empfohlen)
+- Phase 13: Monitoring verbessern
+
+**Bewertung:** System ist sicher für Produktivbetrieb, mit kleinen Verbesserungen in Phasen 9-10
+
+---
+
 ## [Version 1.0 - Produktiv-Release] - 2026-01-30
 
 ### Status: PRODUKTIV EINSETZBAR

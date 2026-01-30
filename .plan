@@ -317,13 +317,46 @@ class RateLimiter:
 
 ## Nächste Schritte (Phase 9+)
 
-### Zukünftige Erweiterungen (optional):
-- Phase 9: Relative Pfade und DATA_DIR Konfiguration
-- Phase 10: Rate Limiting implementieren
-- Phase 11: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
-- Phase 12: Dashboard und Monitoring
-- Phase 13: Multi-Bot-Support
-- Phase 14: Deploy als Docker-Container
+### KRITISCH (sofort beheben):
+- Phase 9: Dependencies aktualisieren
+  - [ ] requirements.txt auf neueste Versionen (requests 2.32.3, aiohttp 3.11.11, python-telegram-bot 21.11)
+  - [ ] pip audit ausführen
+  - [ ] Lokal testen
+  - [ ] Neu deployen auf Coolify
+- Phase 10: Datei-Permissions korrigieren
+  - [ ] .env Datei: chmod 600 (nur Owner kann lesen/schreiben)
+
+### EMPFOHLEN (mittelfristig):
+- Phase 11: Prompt Injection Defense (LLM Input Validation)
+  - [ ] Prompt-Validierung VOR LLM-Übergabe implementieren
+  - [ ] Technologien evaluieren:
+    - Option 1: NeMo Guardrails (NVIDIA)
+    - Option 2: Guardrails AI (Open Source)
+    - Option 3: LangChain Input Guards
+    - Option 4: Custom Regex-basierte Filterung
+  - [ ] System-Prompt-Override-Detection
+  - [ ] Jailbreak-Pattern-Detection
+  - [ ] Content-Policy-Validation
+  - [ ] Tests für bekannte Prompt-Injection-Techniken
+  - Dokumentation: Context/PromptInjectionDefense.md
+
+- Phase 12: Rate Limiting implementieren
+  - [ ] Rate Limiter Klasse (10-20 Nachrichten/Minute pro User)
+  - [ ] RATE_LIMIT_PER_MINUTE in .env
+  - [ ] DoS-Schutz durch autorisierte User
+  - [ ] Cooldown für Deep Search
+
+- Phase 13: Monitoring verbessern
+  - [ ] Health-Endpoint mit Status-Infos (optional HTTP-Server)
+  - [ ] Alerting bei Fehlern
+  - [ ] Log-Rotation für lange Laufzeiten
+
+### OPTIONAL (Nice-to-have):
+- Phase 14: Verschlüsselung der Memory-Dateien at-rest
+- Phase 15: Backup-Strategie für /data Volume
+- Phase 16: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
+- Phase 17: Dashboard und Monitoring-UI
+- Phase 18: Multi-Bot-Support
 
 ## Status (Stand: 30. Januar 2026)
 
