@@ -315,7 +315,7 @@ class RateLimiter:
         self.requests = {}  # {user_id: [timestamps]}
 ```
 
-## Phase 9: Task Manager System ✓ IMPLEMENTIERT (31. Januar 2026)
+## Phase 9: Task Manager System ✓ VOLLSTÄNDIG IMPLEMENTIERT (31. Januar 2026)
 
 **Ziel:** Ermöglicht dem Bot, Python-Skripte für Benutzer zu erstellen, zu verwalten und auszuführen.
 
@@ -328,12 +328,18 @@ class RateLimiter:
 - [x] Dateistruktur: important/skills/ für wiederverwendbare Scripts
 
 **Implementierung:**
-- [x] task_manager.py (572 Zeilen)
-  - create_task(): Task erstellen mit Name, Description, Script
+- [x] task_manager.py (720 Zeilen)
+  - create_task(): Task erstellen mit LLM-generiertem Snake-Case Namen
   - get_task(): Task laden
   - update_task(): Status, Script, Execution History aktualisieren
-  - list_tasks(): Tasks nach Status filtern
+  - list_tasks(): Tasks nach Status filtern (default: "all")
   - delete_task(): Task archivieren
+  - **run_task()**: ✓ IMPLEMENTIERT (31.01.2026 11:52 Uhr)
+    - Automatische Script-Generierung via LLM wenn Script leer
+    - Sichere Ausführung mit subprocess (30s Timeout)
+    - User-Input als sys.argv[1] Parameter
+    - Markdown-Code-Block-Bereinigung
+    - Execution History wird gespeichert
   - save_as_skill(): Task als Skill speichern
   - get_skill(): Skill laden
   - list_skills(): Alle Skills auflisten
@@ -341,39 +347,63 @@ class RateLimiter:
   - Tasks-Ordner: active/, completed/, archived/, workspace/
   - Skills-Ordner: skills/
   - Index-Dateien: tasks/index.md, skills/index.md
-- [x] Tests geschrieben: test_task_manager.py (14 Tests, alle bestehen)
+- [x] Tests geschrieben: test_task_manager.py (17 Tests, alle bestehen)
 - [x] Integration mit FileStructureManager
 
-**Status:** ✓ Vollständig implementiert und getestet (31.01.2026)
+**Bot-Integration:** ✓ VOLLSTÄNDIG ABGESCHLOSSEN (31.01.2026 12:00 Uhr)
+- [x] /task create <Beschreibung> - Task erstellen
+- [x] /task list - Alle Tasks anzeigen (active, completed, archived)
+- [x] /task show <task_id> - Task-Details anzeigen
+- [x] /task run <task_id> [parameter] - Task ausführen
+- [x] /task delete <task_id> - Task löschen
+- [x] /skill Command implementiert (save, list, show, run, delete)
+- [x] Bot-Commands bei Telegram registriert
+- [x] /help zeigt alle Task-Commands
+- [x] Fehler behoben: LLM-Client Aufruf korrigiert (user_message statt messages)
+- [x] Fehler behoben: run_task() Methode implementiert
+- [x] API-Dokumentation: Context/TaskManagerAPI.md
+
+**Task-Namen-Format (AKTUELL 31.01.2026):**
+- Task-Namen: ENGLISCH, Snake-Case (z.B. "add_7_numbers", "is_prime")
+- Task-IDs: Identisch mit Task-Namen
+- Few-Shot LLM-Prompt mit englischen Beispielen
+- Automatische Konfliktbehandlung (_v2, _v3 bei Duplikaten)
+- Fallback bei LLM-Fehler: Erste 4 Wörter der Beschreibung
 
 **Test-Ergebnisse:**
-- 14 neue Task Manager Tests - alle bestehen ✓
-- Gesamt: 58 von 60 Tests bestehen
+- 17 Task Manager Tests - alle bestehen ✓
 - Task-Erstellung, -Update, -Löschung funktionieren
+- Task-Ausführung mit LLM-Script-Generierung funktioniert
 - Skill-System funktioniert
 - Status-Wechsel (active → completed → archived) funktionieren
 
-**Hinweis:** Bot-Integration steht noch aus (Phase 10)
-
 ## Nächste Schritte (Phase 10+)
 
-### KRITISCH (sofort beheben):
-- Phase 10: Task Manager Bot-Integration
-  - [ ] /task Command implementieren (Task erstellen)
-  - [ ] /tasks Command implementieren (Tasks auflisten)
-  - [ ] /runtask Command implementieren (Task ausführen)
-  - [ ] /skill Command implementieren (Skill speichern/laden)
-  - [ ] LLM-Tool für automatische Task-Erstellung
+### KRITISCH (sofort implementieren):
+- Phase 10: Automatische Task-Ausführung im Chat ⚠️ NEU (31.01.2026)
+  - [ ] Tool-Funktion `execute_task(user_query)` für LLM implementieren
+  - [ ] Semantische Task-Suche basierend auf Beschreibung
+  - [ ] LLM entscheidet automatisch: Neue Task erstellen vs. Existierende ausführen
+  - [ ] Automatische Parameter-Extraktion aus User-Query
+  - [ ] Integration in normalen Chat-Workflow (nicht nur /task Commands)
+  - **Ziel:** User sagt "Berechne Fibonacci" → Bot findet Task oder erstellt neue → Führt aus
+  - **Implementierungsdetails:**
+    - Tool registrieren: `_tool_execute_task(query: str) -> str`
+    - list_tasks() durchsuchen nach ähnlicher Beschreibung
+    - Bei Match: run_task() aufrufen mit extrahierten Parametern
+    - Bei Kein Match: create_task() + run_task() in einem Schritt
+    - Antwort: TTS-kompatibles Ergebnis
+
+### EMPFOHLEN (mittelfristig):
 - Phase 11: Dependencies aktualisieren
   - [ ] requirements.txt auf neueste Versionen (requests 2.32.3, aiohttp 3.11.11, python-telegram-bot 21.11)
   - [ ] pip audit ausführen
   - [ ] Lokal testen
   - [ ] Neu deployen auf Coolify
-- Phase 10: Datei-Permissions korrigieren
+- Phase 12: Datei-Permissions korrigieren
   - [ ] .env Datei: chmod 600 (nur Owner kann lesen/schreiben)
 
-### EMPFOHLEN (mittelfristig):
-- Phase 11: Prompt Injection Defense (LLM Input Validation)
+- Phase 13: Prompt Injection Defense (LLM Input Validation)
   - [ ] Prompt-Validierung VOR LLM-Übergabe implementieren
   - [ ] Technologien evaluieren:
     - Option 1: NeMo Guardrails (NVIDIA)
@@ -386,23 +416,23 @@ class RateLimiter:
   - [ ] Tests für bekannte Prompt-Injection-Techniken
   - Dokumentation: Context/PromptInjectionDefense.md
 
-- Phase 12: Rate Limiting implementieren
+- Phase 14: Rate Limiting implementieren
   - [ ] Rate Limiter Klasse (10-20 Nachrichten/Minute pro User)
   - [ ] RATE_LIMIT_PER_MINUTE in .env
   - [ ] DoS-Schutz durch autorisierte User
   - [ ] Cooldown für Deep Search
 
-- Phase 13: Monitoring verbessern
+- Phase 15: Monitoring verbessern
   - [ ] Health-Endpoint mit Status-Infos (optional HTTP-Server)
   - [ ] Alerting bei Fehlern
   - [ ] Log-Rotation für lange Laufzeiten
 
 ### OPTIONAL (Nice-to-have):
-- Phase 14: Verschlüsselung der Memory-Dateien at-rest
-- Phase 15: Backup-Strategie für /data Volume
-- Phase 16: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
-- Phase 17: Dashboard und Monitoring-UI
-- Phase 18: Multi-Bot-Support
+- Phase 16: Verschlüsselung der Memory-Dateien at-rest
+- Phase 17: Backup-Strategie für /data Volume
+- Phase 18: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
+- Phase 19: Dashboard und Monitoring-UI
+- Phase 20: Multi-Bot-Support
 
 ## Status (Stand: 30. Januar 2026)
 

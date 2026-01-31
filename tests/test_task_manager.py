@@ -50,9 +50,9 @@ def test_create_task(task_manager):
         auto_execute=False
     )
 
-    # Prüfe dass Task-ID generiert wurde
-    assert task_id.startswith("task_")
-    assert len(task_id) > 10
+    # Prüfe dass Task-ID generiert wurde (Snake-Case Format)
+    assert task_id == "test_task"
+    assert "_" in task_id or task_id.islower()
 
     # Prüfe dass Task-Datei existiert
     task_file = task_manager.file_manager.get_task_active_dir(user_id) / f"{task_id}.md"
@@ -316,3 +316,96 @@ def test_save_task_without_script_fails(task_manager):
     # Versuche als Skill zu speichern
     skill_path = task_manager.save_as_skill(user_id, task_id)
     assert skill_path is None
+
+
+def test_create_task_with_metadata(task_manager):
+    """Test: Task mit Metadaten wird korrekt erstellt."""
+    user_id = 12345
+
+    metadata = {
+        "tags": ["mathematik", "addition", "berechnung"],
+        "category": "datenverarbeitung",
+        "input_schema": {"numbers": "List[int]"},
+        "output_schema": {"sum": "int"},
+        "use_cases": [
+            "Addiere beliebig viele Zahlen",
+            "Berechne Gesamtsummen aus Listen"
+        ]
+    }
+
+    task_id = task_manager.create_task(
+        user_id=user_id,
+        name="Addiere drei Zahlen",
+        description="Addiert drei gegebene Zahlen",
+        metadata=metadata
+    )
+
+    # Lade Task
+    task = task_manager.get_task(user_id, task_id)
+
+    assert task is not None
+    assert task["id"] == "addiere_drei_zahlen"
+    assert task["metadata"]["category"] == "datenverarbeitung"
+    assert "mathematik" in task["metadata"]["tags"]
+    assert "addition" in task["metadata"]["tags"]
+    assert task["metadata"]["input_schema"]["numbers"] == "List[int]"
+    assert task["metadata"]["output_schema"]["sum"] == "int"
+    assert len(task["metadata"]["use_cases"]) == 2
+
+
+def test_snake_case_conversion(task_manager):
+    """Test: Task-Namen werden korrekt zu Snake-Case konvertiert."""
+    user_id = 12345
+
+    # Test mit Umlauten
+    task_id1 = task_manager.create_task(
+        user_id=user_id,
+        name="Zähle Äpfel und Birnen",
+        description="Test"
+    )
+    assert task_id1 == "zaehle_aepfel_und_birnen"
+
+    # Test mit Sonderzeichen
+    task_id2 = task_manager.create_task(
+        user_id=user_id,
+        name="Berechne x+y=z",
+        description="Test"
+    )
+    assert task_id2 == "berechne_x_y_z"
+
+    # Test mit mehrfachen Leerzeichen
+    task_id3 = task_manager.create_task(
+        user_id=user_id,
+        name="Test   mit    Leerzeichen",
+        description="Test"
+    )
+    assert task_id3 == "test_mit_leerzeichen"
+
+
+def test_duplicate_task_names(task_manager):
+    """Test: Doppelte Task-Namen erhalten Versions-Suffix."""
+    user_id = 12345
+
+    # Erstelle erste Task
+    task_id1 = task_manager.create_task(
+        user_id=user_id,
+        name="Duplikat Test",
+        description="Erste Task"
+    )
+    assert task_id1 == "duplikat_test"
+
+    # Erstelle zweite Task mit gleichem Namen
+    task_id2 = task_manager.create_task(
+        user_id=user_id,
+        name="Duplikat Test",
+        description="Zweite Task"
+    )
+    assert task_id2 == "duplikat_test_v2"
+
+    # Erstelle dritte Task mit gleichem Namen
+    task_id3 = task_manager.create_task(
+        user_id=user_id,
+        name="Duplikat Test",
+        description="Dritte Task"
+    )
+    assert task_id3 == "duplikat_test_v3"

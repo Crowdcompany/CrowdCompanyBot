@@ -2,6 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## KRITISCH: Sofortige Dokumentationspflicht (HÖCHSTE PRIORITÄT)
+
+**VERBINDLICHE REGEL:** Nach JEDER signifikanten Implementierung oder Änderung MUSST du SOFORT diese CLAUDE.md Datei aktualisieren!
+
+### Warum diese Regel existiert
+- Claude Code hat ein Kontextfenster das sich erneuert
+- Ohne sofortige Dokumentation werden kürzlich implementierte Features vergessen
+- Der Benutzer wird frustriert wenn du Dinge vergisst die du gerade selbst implementiert hast
+- Diese Datei ist deine einzige zuverlässige Gedächtnisstütze
+
+### PFLICHT: Nach jeder Implementierung
+1. **Sofort nach Code-Änderungen**: Aktualisiere den "Implementierungsstatus" Abschnitt
+2. **Dokumentiere ALLE neuen Features**: Format, Verhalten, Beispiele
+3. **Aktualisiere API-Dokumentation**: Wenn sich Funktionssignaturen ändern
+4. **Dokumentiere Breaking Changes**: Wenn sich das Verhalten ändert
+5. **Füge Beispiele hinzu**: Zeige wie neue Features genutzt werden
+
+### Wann dokumentieren?
+- ✓ SOFORT nach Implementierung (nicht später!)
+- ✓ BEVOR du dem Benutzer "Fertig!" meldest
+- ✓ AUCH bei kleinen Änderungen (z.B. Prompt-Anpassungen)
+- ✓ BESONDERS bei Format-Änderungen (z.B. Task-ID Format)
+
+### Beispiel für GUTE Dokumentation
+```markdown
+✓ **Phase 9: Task Manager System** - VOLLSTÄNDIG IMPLEMENTIERT (31.01.2026)
+- **AKTUELL (31.01.2026 17:30 Uhr):**
+  - Task-Namen: ENGLISCH, Snake-Case Format (z.B. "add_7_numbers")
+  - Task-IDs: Automatisch aus Namen generiert (z.B. "add_7_numbers")
+  - Few-Shot Prompt: Nutzt englische Beispiele für Snake-Case Generierung
+  - Bot-Ausgabe: Minimalistisch (nur Name + Task-ID)
+  - Beispiel-Output:
+    ```
+    Task erstellt!
+
+    Name: add_7_numbers
+    Task-ID: add_7_numbers
+    ```
+```
+
+### Beispiel für SCHLECHTE Dokumentation
+```markdown
+✓ **Phase 9: Task Manager System** - VOLLSTÄNDIG IMPLEMENTIERT (31.01.2026)
+- Task-Verwaltung für automatisierte Python-Skripte
+```
+
+**DIESE REGEL ÜBERSCHREIBT ALLE ANDEREN PRIORITÄTEN!**
+
 ## Projektüberblick
 
 Crowdbot ist ein funktionsfähiger KI-Assistent als sicherere Alternative zu Moltbot. Ein persönlicher Telegram-Bot der lokal betrieben wird und sensible Daten nicht an externe Cloud-Dienste sendet.
@@ -79,13 +127,40 @@ Das System besteht aus drei Hauptkomponenten:
 - Input-Validierung
 - TTS-Kompatibilität für alle Ausgaben
 
-✓ **Phase 9: Task Manager System** - IMPLEMENTIERT (31.01.2026)
-- Task-Verwaltung für automatisierte Python-Skripte
-- Script-Versionierung und Execution History
-- Skill-System für wiederverwendbare Scripts
-- Dateistruktur: important/tasks/ und important/skills/
-- 14 Tests implementiert, alle bestehen
-- Bot-Integration steht noch aus
+✓ **Phase 9: Task Manager System** - VOLLSTÄNDIG IMPLEMENTIERT (31.01.2026)
+
+**IMPLEMENTIERT:**
+- ✓ Task-Erstellung mit LLM-generiertem Snake-Case Namen
+- ✓ Task-Verwaltung (create, get, list, delete, update)
+- ✓ Script-Versionierung und Metadaten-System
+- ✓ Skill-System (save, get, list)
+- ✓ Dateistruktur: important/tasks/ und important/skills/
+- ✓ Bot-Integration: /task create, /task list, /task show, /task delete, /task run
+- ✓ **`run_task()` Methode IMPLEMENTIERT** (31.01.2026 11:52 Uhr)
+  - Automatische Script-Generierung via LLM wenn Script leer
+  - Sichere Script-Ausführung mit subprocess (30s Timeout)
+  - User-Input als Parameter unterstützt
+  - Execution History wird gespeichert
+  - Markdown-Code-Block-Bereinigung implementiert
+  - Code-Referenz: [src/task_manager.py:298-420](src/task_manager.py#L298-L420)
+- ✓ 17 Tests implementiert und bestanden
+
+**TASK-NAMEN-FORMAT (AKTUELL 31.01.2026 18:40 Uhr):**
+  - **Task-Namen:** ENGLISCH, Snake-Case (z.B. "add_7_numbers", "is_prime")
+  - **Task-IDs:** Identisch mit Task-Namen (z.B. "add_7_numbers")
+  - **Few-Shot LLM-Prompt:** Nutzt englische Beispiele (src/bot.py:683-741)
+  - **LLM-Aufruf:** `self.llm_client.chat(user_message=name_prompt, max_tokens=20)`
+  - **BUGFIX (31.01.2026 18:38 Uhr):** LLM-Client korrigiert von `messages=[...]` zu `user_message=...`
+  - **Bot-Ausgabe:** Minimalistisch - nur Name + Task-ID
+  - **Automatische Konfliktbehandlung:** Bei Duplikaten "_v2", "_v3" anhängen
+  - **Fallback:** Bei LLM-Fehler erste 4 Wörter der Beschreibung nutzen
+  - **Beispiele:**
+    - "Primzahl prüfen" → `is_prime`
+    - "Fibonacci berechnen" → `fibonacci_sequence`
+    - "Text rekursiv zurückgeben" → `return_recursive_text`
+    - "Liste sortieren" → `sort_word_list`
+
+**API-Dokumentation:** Context/TaskManagerAPI.md
 
 ## API-Konfiguration
 
@@ -151,7 +226,7 @@ pytest tests/ -v
 # Spezifische Test-Suite
 pytest tests/test_auth.py -v
 
-# Aktueller Stand: 32/32 Tests bestanden ✓
+# Aktueller Stand: 49/49 Tests bestanden ✓ (inkl. 17 Task Manager Tests)
 ```
 
 ## KRITISCH: TTS-Kompatibilität und Markdown

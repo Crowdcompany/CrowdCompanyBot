@@ -20,6 +20,8 @@ from src.memory_manager_v2 import MemoryManagerV2
 from src.llm_client import LLMClient
 from src.search_module import SearchModule
 from src.web_import import WebImporter
+from src.task_manager import TaskManager
+from src.skill_manager import SkillManager
 from dotenv import load_dotenv
 import os
 
@@ -86,6 +88,8 @@ class Crowdbot:
         self.llm_client = LLMClient()
         self.search_module = SearchModule()
         self.web_importer = WebImporter(data_dir=data_dir)
+        self.task_manager = TaskManager(data_dir=data_dir)
+        self.skill_manager = SkillManager(data_dir=data_dir)
 
         # Tool registrieren: web_search
         self.llm_client.register_tool(
@@ -248,6 +252,8 @@ class Crowdbot:
         self.application.add_handler(CommandHandler("searchmd", self.search_md_command))
         self.application.add_handler(CommandHandler("deepresearch", self.deep_research_command))
         self.application.add_handler(CommandHandler("import", self.import_command))
+        self.application.add_handler(CommandHandler("task", self.task_command))
+        self.application.add_handler(CommandHandler("skill", self.skill_command))
         self.application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
@@ -324,6 +330,12 @@ class Crowdbot:
             "/deepresearch <Anfrage> - Ausführliche Analyse (Jina Deep Research)\n"
             "/searchmd <Anfrage> - Suche mit Markdown-Datei\n"
             "/import <URL> [dateiname] - Importiere Webseite dauerhaft ins Memory\n"
+            "/task create <Beschreibung> - Erstelle neuen Task\n"
+            "/task list - Zeige alle Tasks\n"
+            "/task run <task_id> [parameter] - Führe Task aus\n"
+            "/task show <task_id> - Zeige Task-Details\n"
+            "/task delete <task_id> - Lösche Task\n"
+            "/skill - Skill Manager für wiederverwendbare Scripts\n"
             "/help - Zeigt diese Hilfe an\n\n"
             "Über Crowdbot:\n"
             "Ich bin ein selbst gehosteter KI-Assistent. "
@@ -336,6 +348,13 @@ class Crowdbot:
             "Mit /import kannst du Webseiten dauerhaft in dein Memory importieren. "
             "Der Inhalt wird bereinigt und in important/ gespeichert, wo er nie gelöscht wird. "
             "Perfekt für Dokumentationen, Artikel oder wichtige Informationen.\n\n"
+            "Task Manager:\n"
+            "Mit /task kannst du automatisierte Python-Tasks erstellen. "
+            "Das LLM generiert und führt Python-Code für dich aus. "
+            "Nutze /task create <Beschreibung> um zu starten.\n\n"
+            "Skill Manager:\n"
+            "Mit /skill kannst du erfolgreiche Tasks als wiederverwendbare Skills speichern. "
+            "Nutze /skill save <task_id> <name> um einen Task zu speichern.\n\n"
             "Schreib mir einfach eine Nachricht, um ins Gespräch zu kommen!"
         )
 
@@ -619,6 +638,407 @@ class Crowdbot:
             await update.message.reply_text(error_message)
             logger.error(f"Web-Import fehlgeschlagen: {url} - {message}")
 
+    async def task_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handler für den /task Befehl.
+
+        Verwaltet automatisierte Python-Tasks:
+        - /task create <Beschreibung> - Erstellt einen neuen Task
+        - /task list - Zeigt alle Tasks
+        - /task show <task_id> - Zeigt Task-Details
+        - /task run <task_id> - Führt einen Task aus
+        - /task delete <task_id> - Löscht einen Task
+        """
+        if not await self.check_authorization(update):
+            return
+
+        user_id = update.effective_user.id
+
+        if not self.memory_manager.user_exists(user_id):
+            await update.message.reply_text("Bitte starte den Bot erst mit /start!")
+            return
+
+        # Subcommand parsen
+        if not context.args or len(context.args) == 0:
+            await update.message.reply_text(
+                "Task Manager Befehle:\n\n"
+                "/task create <Beschreibung> - Neuen Task erstellen\n"
+                "/task list - Alle Tasks anzeigen\n"
+                "/task show <task_id> - Task-Details anzeigen\n"
+                "/task run <task_id> - Task ausführen\n"
+                "/task delete <task_id> - Task löschen\n\n"
+                "Beispiel: /task create Schreibe ein Python-Skript das die Fibonacci-Folge berechnet"
+            )
+            return
+
+        subcommand = context.args[0].lower()
+
+        # CREATE
+        if subcommand == "create":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib eine Beschreibung an!\nBeispiel: /task create Addiere drei Zahlen")
+                return
+
+            description = " ".join(context.args[1:])
+
+            # Nutze LLM mit Few-Shot Examples für intelligente Task-Namen
+            await update.message.chat.send_action("typing")
+
+            name_prompt = f"""Aufgabe: Generiere einen kurzen Task-Namen im Snake-Case Format (Englisch, Kleinbuchstaben, Unterstriche).
+
+Benutzerbeschreibung: "{description}"
+
+Lerne aus diesen Beispielen:
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion, die prüft, ob eine Zahl eine Primzahl ist"
+Ausgabe: is_prime
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion, die eine Liste von Wörtern alphabetisch sortiert"
+Ausgabe: sort_word_list
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion, die die Fibonacci-Zahlen bis n berechnet"
+Ausgabe: fibonacci_sequence
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion, die prüft, ob ein Text ein Palindrom ist"
+Ausgabe: is_palindrome
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion, die die Häufigkeit jedes Buchstabens in einem Text zählt"
+Ausgabe: char_frequency
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion zum Addieren von 7 Zahlen"
+Ausgabe: add_7_numbers
+
+Eingabe: "Testaufgabe: Erstelle eine Python-Funktion die Text entgegen nimmt und rekursiv zurück gibt"
+Ausgabe: return_recursive_text
+
+Eingabe: "Schreibe ein Script für die Fibonacci-Folge bis n=100"
+Ausgabe: fibonacci_calculator
+
+Eingabe: "Erstelle Code zum Parsen von JSON-Dateien"
+Ausgabe: parse_json
+
+Eingabe: "Implementiere eine Sortierfunktion für Listen"
+Ausgabe: sort_list
+
+Eingabe: "Entwickle einen Web-Scraper für News-Artikel"
+Ausgabe: scrape_news
+
+Eingabe: "Baue eine Funktion zum Validieren von E-Mail-Adressen"
+Ausgabe: validate_email
+
+Eingabe: "Erstelle einen PDF-Generator aus Markdown"
+Ausgabe: markdown_to_pdf
+
+Eingabe: "Programmiere einen CSV-Importer mit Fehlerbehandlung"
+Ausgabe: import_csv
+
+Eingabe: "Schreibe ein Tool zum Komprimieren von Bildern"
+Ausgabe: compress_images
+
+Wichtig:
+- Entferne Präfixe wie "Testaufgabe:", "Erstelle", "Schreibe", "Implementiere"
+- Nutze ENGLISCHE Begriffe
+- Snake-Case Format: nur Kleinbuchstaben und Unterstriche
+- Maximal 2-4 Wörter
+- Fokussiere auf die Hauptaktion (Verb) und das Objekt
+
+Generiere jetzt den Task-Namen. Antworte NUR mit dem Snake-Case Namen (z.B. "calculate_sum"), NICHTS anderes:"""
+
+            try:
+                name_response = self.llm_client.chat(
+                    user_message=name_prompt,
+                    max_tokens=20
+                )
+                name = name_response.strip().strip('"').strip("'").strip()
+
+                # Validierung
+                word_count = len(name.split())
+                if word_count > 5 or len(name) > 60 or len(name) < 3:
+                    logger.warning(f"LLM-Name ungültig: '{name}' ({word_count} Wörter), verwende Fallback")
+                    # Fallback
+                    clean_desc = description.lower()
+                    for prefix in ["testaufgabe:", "erstelle", "schreibe", "implementiere", "programmiere"]:
+                        clean_desc = clean_desc.replace(prefix, "").strip()
+                    words = clean_desc.split()[:4]
+                    name = " ".join(words)
+
+            except Exception as e:
+                logger.warning(f"Fehler bei LLM-Name-Generierung: {e}")
+                # Fallback
+                clean_desc = description.lower()
+                for prefix in ["testaufgabe:", "erstelle", "schreibe"]:
+                    clean_desc = clean_desc.replace(prefix, "").strip()
+                words = clean_desc.split()[:4]
+                name = " ".join(words)
+
+            task_id = self.task_manager.create_task(user_id, name, description)
+
+            await update.message.reply_text(
+                f"Task erstellt!\n\n"
+                f"Name: {name}\n"
+                f"Task-ID: {task_id}"
+            )
+
+        # LIST
+        elif subcommand == "list":
+            tasks = self.task_manager.list_tasks(user_id, status="all")
+
+            if not tasks:
+                await update.message.reply_text("Du hast noch keine Tasks erstellt.")
+                return
+
+            message_lines = ["Deine Tasks:\n"]
+            for task in tasks:
+                status_emoji = {
+                    "active": "⏳",
+                    "running": "▶️",
+                    "completed": "✅",
+                    "failed": "❌"
+                }.get(task["status"], "❓")
+
+                desc_short = task["description"][:50] + "..." if len(task["description"]) > 50 else task["description"]
+                message_lines.append(
+                    f"{status_emoji} {task['id']}: {desc_short} ({task['status']})"
+                )
+
+            await update.message.reply_text("\n".join(message_lines))
+
+        # SHOW
+        elif subcommand == "show":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib eine Task-ID an!\nBeispiel: /task show task_001")
+                return
+
+            task_id = context.args[1]
+            task = self.task_manager.get_task(user_id, task_id)
+
+            if not task:
+                await update.message.reply_text(f"Task {task_id} nicht gefunden.")
+                return
+
+            message = (
+                f"Task Details:\n\n"
+                f"ID: {task['id']}\n"
+                f"Name: {task['name']}\n"
+                f"Status: {task['status']}\n"
+                f"Erstellt: {task['created']}\n"
+                f"Version: {task.get('version', 1)}\n"
+                f"Beschreibung: {task['description']}\n\n"
+            )
+
+            # Metadaten anzeigen
+            metadata = task.get("metadata", {})
+            if metadata.get("category"):
+                message += f"Kategorie: {metadata['category']}\n"
+            if metadata.get("tags"):
+                message += f"Tags: {', '.join(metadata['tags'])}\n"
+
+            # Execution History
+            if task.get("execution_history"):
+                message += f"\nAusführungen: {len(task['execution_history'])}\n"
+                latest = task["execution_history"][-1]
+                message += f"Letzte Ausführung: {latest['timestamp']} - {latest['status']}\n"
+
+            await update.message.reply_text(message)
+
+        # RUN
+        elif subcommand == "run":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib eine Task-ID an!\nBeispiel: /task run task_001")
+                return
+
+            task_id = context.args[1]
+
+            # Optional: User-Input als weitere Argumente
+            user_input = " ".join(context.args[2:]) if len(context.args) > 2 else ""
+
+            await update.message.chat.send_action("typing")
+            await update.message.reply_text(
+                f"Führe Task {task_id} aus...\n\n"
+                "Dies kann einen Moment dauern. Das LLM generiert ein Python-Skript und führt es aus."
+            )
+
+            success, result = self.task_manager.run_task(user_id, task_id, self.llm_client, user_input)
+
+            if success:
+                # Ergebnis kürzen falls nötig
+                if len(result) > 3000:
+                    result = result[:3000] + "\n\n...(gekürzt)"
+
+                await update.message.reply_text(
+                    f"Task erfolgreich ausgeführt!\n\n"
+                    f"Ergebnis:\n{result}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"Task fehlgeschlagen!\n\n"
+                    f"Fehler:\n{result}"
+                )
+
+        # DELETE
+        elif subcommand == "delete":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib eine Task-ID an!\nBeispiel: /task delete task_001")
+                return
+
+            task_id = context.args[1]
+
+            if self.task_manager.delete_task(user_id, task_id):
+                await update.message.reply_text(f"Task {task_id} wurde gelöscht.")
+            else:
+                await update.message.reply_text(f"Task {task_id} nicht gefunden.")
+
+        else:
+            await update.message.reply_text(
+                f"Unbekannter Befehl: {subcommand}\n\n"
+                "Verfügbare Befehle: create, list, show, run, delete"
+            )
+
+    async def skill_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Handler für den /skill Befehl.
+
+        Verwaltet wiederverwendbare Skills:
+        - /skill save <task_id> <skill_name> - Task als Skill speichern
+        - /skill list - Alle Skills anzeigen
+        - /skill show <skill_name> - Skill-Details anzeigen
+        - /skill run <skill_name> [args] - Skill ausführen
+        - /skill delete <skill_name> - Skill löschen
+        """
+        if not await self.check_authorization(update):
+            return
+
+        user_id = update.effective_user.id
+
+        if not self.memory_manager.user_exists(user_id):
+            await update.message.reply_text("Bitte starte den Bot erst mit /start!")
+            return
+
+        # Subcommand parsen
+        if not context.args or len(context.args) == 0:
+            await update.message.reply_text(
+                "Skill Manager Befehle:\n\n"
+                "/skill save <task_id> <skill_name> - Task als Skill speichern\n"
+                "/skill list - Alle Skills anzeigen\n"
+                "/skill show <skill_name> - Skill-Details anzeigen\n"
+                "/skill run <skill_name> [args] - Skill ausführen\n"
+                "/skill delete <skill_name> - Skill löschen\n\n"
+                "Beispiel: /skill save task_001 fibonacci_berechner"
+            )
+            return
+
+        subcommand = context.args[0].lower()
+
+        # SAVE
+        if subcommand == "save":
+            if len(context.args) < 3:
+                await update.message.reply_text(
+                    "Bitte gib Task-ID und Skill-Namen an!\n"
+                    "Beispiel: /skill save task_001 mein_skill"
+                )
+                return
+
+            task_id = context.args[1]
+            skill_name = context.args[2]
+
+            if self.skill_manager.save_skill(user_id, task_id, skill_name, self.task_manager):
+                await update.message.reply_text(
+                    f"Skill gespeichert!\n\n"
+                    f"Name: {skill_name}\n"
+                    f"Führe ihn mit /skill run {skill_name} aus"
+                )
+            else:
+                await update.message.reply_text(
+                    f"Fehler beim Speichern des Skills.\n"
+                    f"Task {task_id} wurde noch nicht erfolgreich ausgeführt."
+                )
+
+        # LIST
+        elif subcommand == "list":
+            skills = self.skill_manager.list_skills(user_id)
+
+            if not skills:
+                await update.message.reply_text("Du hast noch keine Skills gespeichert.")
+                return
+
+            message_lines = ["Deine Skills:\n"]
+            for skill in skills:
+                desc_short = skill["description"][:50] + "..." if len(skill["description"]) > 50 else skill["description"]
+                message_lines.append(f"- {skill['name']}: {desc_short}")
+
+            await update.message.reply_text("\n".join(message_lines))
+
+        # SHOW
+        elif subcommand == "show":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib einen Skill-Namen an!\nBeispiel: /skill show mein_skill")
+                return
+
+            skill_name = context.args[1]
+            skill = self.skill_manager.get_skill(user_id, skill_name)
+
+            if not skill:
+                await update.message.reply_text(f"Skill {skill_name} nicht gefunden.")
+                return
+
+            message = (
+                f"Skill Details:\n\n"
+                f"Name: {skill['name']}\n"
+                f"Erstellt: {skill['created_at']}\n"
+                f"Beschreibung: {skill['description']}\n"
+                f"Version: {skill['current_version']}\n"
+            )
+
+            await update.message.reply_text(message)
+
+        # RUN
+        elif subcommand == "run":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib einen Skill-Namen an!\nBeispiel: /skill run mein_skill")
+                return
+
+            skill_name = context.args[1]
+            args = context.args[2:] if len(context.args) > 2 else []
+
+            await update.message.chat.send_action("typing")
+            await update.message.reply_text(f"Führe Skill {skill_name} aus...")
+
+            success, result = self.skill_manager.run_skill(user_id, skill_name, args)
+
+            if success:
+                # Ergebnis kürzen falls nötig
+                if len(result) > 3000:
+                    result = result[:3000] + "\n\n...(gekürzt)"
+
+                await update.message.reply_text(
+                    f"Skill erfolgreich ausgeführt!\n\n"
+                    f"Ergebnis:\n{result}"
+                )
+            else:
+                await update.message.reply_text(
+                    f"Skill fehlgeschlagen!\n\n"
+                    f"Fehler:\n{result}"
+                )
+
+        # DELETE
+        elif subcommand == "delete":
+            if len(context.args) < 2:
+                await update.message.reply_text("Bitte gib einen Skill-Namen an!\nBeispiel: /skill delete mein_skill")
+                return
+
+            skill_name = context.args[1]
+
+            if self.skill_manager.delete_skill(user_id, skill_name):
+                await update.message.reply_text(f"Skill {skill_name} wurde gelöscht.")
+            else:
+                await update.message.reply_text(f"Skill {skill_name} nicht gefunden.")
+
+        else:
+            await update.message.reply_text(
+                f"Unbekannter Befehl: {subcommand}\n\n"
+                "Verfügbare Befehle: save, list, show, run, delete"
+            )
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Handler für Textnachrichten.
@@ -699,6 +1119,8 @@ class Crowdbot:
             BotCommand("searchmd", "Suche mit Markdown-Datei"),
             BotCommand("deepresearch", "Ausführliche Analyse"),
             BotCommand("import", "Webseite ins Memory importieren"),
+            BotCommand("task", "Task Manager (create, list, run, delete)"),
+            BotCommand("skill", "Skill Manager (save, list, run, delete)"),
         ]
 
         await application.bot.set_my_commands(commands)
