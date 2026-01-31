@@ -59,14 +59,47 @@ class FileStructureManager:
             "archive/daily",
             "archive/weekly",
             "archive/monthly",
-            "important"
+            "important",
+            "important/tasks/active",
+            "important/tasks/completed",
+            "important/tasks/archived",
+            "important/tasks/workspace",
+            "important/skills"
         ]
 
         for folder in folders:
             (user_dir / folder).mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Memory 2.0 Struktur für User {user_id} erstellt/geprüft")
+        # Erstelle Task-Index falls nicht vorhanden
+        self._ensure_task_index(user_id)
+
+        # Erstelle Skills-Index falls nicht vorhanden
+        self._ensure_skills_index(user_id)
+
+        logger.info(f"Memory 2.0 Struktur (mit Tasks & Skills) für User {user_id} erstellt/geprüft")
         return True
+
+    def _ensure_task_index(self, user_id: int):
+        """Erstellt tasks/index.md falls nicht vorhanden."""
+        index_path = self.get_user_dir(user_id) / "important" / "tasks" / "index.md"
+
+        if not index_path.exists():
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write("# Task Registry\n\n")
+                f.write("Diese Datei ist der Index aller Tasks.\n\n")
+                f.write("## Aktive Tasks\n\n")
+                f.write("## Abgeschlossene Tasks\n\n")
+                f.write("## Archivierte Tasks\n\n")
+
+    def _ensure_skills_index(self, user_id: int):
+        """Erstellt skills/index.md falls nicht vorhanden."""
+        index_path = self.get_user_dir(user_id) / "important" / "skills" / "index.md"
+
+        if not index_path.exists():
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write("# Skill Library\n\n")
+                f.write("Diese Datei enthält alle wiederverwendbaren Skills.\n\n")
+                f.write("## Verfügbare Skills\n\n")
 
     def get_daily_file_path(self, user_id: int, date: datetime = None) -> Path:
         """
@@ -373,3 +406,48 @@ class FileStructureManager:
 
         # Prüfe ob daily/ Ordner existiert (charakteristisch für V2)
         return (user_dir / "daily").exists()
+
+    # Task-Management Funktionen
+
+    def get_tasks_dir(self, user_id: int) -> Path:
+        """Gibt das Tasks-Basisverzeichnis zurück."""
+        return self.get_user_dir(user_id) / "important" / "tasks"
+
+    def get_task_active_dir(self, user_id: int) -> Path:
+        """Gibt das Verzeichnis für aktive Tasks zurück."""
+        return self.get_tasks_dir(user_id) / "active"
+
+    def get_task_completed_dir(self, user_id: int) -> Path:
+        """Gibt das Verzeichnis für abgeschlossene Tasks zurück."""
+        return self.get_tasks_dir(user_id) / "completed"
+
+    def get_task_archived_dir(self, user_id: int) -> Path:
+        """Gibt das Verzeichnis für archivierte Tasks zurück."""
+        return self.get_tasks_dir(user_id) / "archived"
+
+    def get_task_workspace_dir(self, user_id: int) -> Path:
+        """Gibt das Workspace-Verzeichnis für Task-Ausführung zurück."""
+        return self.get_tasks_dir(user_id) / "workspace"
+
+    def get_skills_dir(self, user_id: int) -> Path:
+        """Gibt das Skills-Verzeichnis zurück."""
+        return self.get_user_dir(user_id) / "important" / "skills"
+
+    def list_active_tasks(self, user_id: int) -> List[Path]:
+        """Listet alle aktiven Task-Dateien auf."""
+        active_dir = self.get_task_active_dir(user_id)
+        if not active_dir.exists():
+            return []
+        return sorted(active_dir.glob("*.md"), reverse=True)
+
+    def list_skills(self, user_id: int) -> List[Path]:
+        """Listet alle Skills auf."""
+        skills_dir = self.get_skills_dir(user_id)
+        if not skills_dir.exists():
+            return []
+        # Skills können .py oder .md sein
+        py_files = list(skills_dir.glob("*.py"))
+        md_files = list(skills_dir.glob("*.md"))
+        # Exclude index.md
+        md_files = [f for f in md_files if f.name != "index.md"]
+        return sorted(py_files + md_files)

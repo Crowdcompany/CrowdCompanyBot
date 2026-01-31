@@ -6,6 +6,10 @@ import os
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from telegram import Update, User, Message, Chat
+
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from src.bot import is_authorized, Crowdbot
 
 

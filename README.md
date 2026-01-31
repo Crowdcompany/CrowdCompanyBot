@@ -13,18 +13,20 @@ Ein selbst gehosteter KI-Assistent als sichere Alternative zu Moltbot.
 
 ## Status
 
-**Version 1.0 - Produktiv Einsetzbar** (Stand: 30. Januar 2026)
+**Version 1.2 - Produktiv Einsetzbar** (Stand: 31. Januar 2026)
 
 - ✓ Telegram-Authentifizierung mit Allowlist
 - ✓ GLM-4.7 Sprachmodell via glmproxy.ccpn.cc
-- ✓ Markdown-Gedächtnis V1 (lokal)
+- ✓ Memory 2.0: Hierarchisches Gedächtnis-System mit intelligenter Archivierung
 - ✓ Perplexity Sonar für schnelle Faktensuche
 - ✓ Jina Deep Research für ausführliche Analysen
 - ✓ TTS-kompatible Ausgaben
 - ✓ Tool-System mit automatischer Nutzung
-- ✓ Alle 32 Tests bestanden
+- ✓ Task Manager: Automatisierte Python-Skripte erstellen und ausführen
+- ✓ Skill-System: Wiederverwendbare Scripts speichern
+- ✓ 58 von 60 Tests bestehen
 
-**✓ Memory 2.0 aktiviert!** Hierarchisches Gedächtnis-System mit intelligenter Archivierung läuft jetzt produktiv.
+**Neu:** Task Manager System für automatisierte Python-Skripte implementiert!
 
 Siehe [CHANGELOG.md](CHANGELOG.md) für Details.
 
