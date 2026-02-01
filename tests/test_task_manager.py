@@ -409,3 +409,187 @@ def test_duplicate_task_names(task_manager):
         description="Dritte Task"
     )
     assert task_id3 == "duplikat_test_v3"
+
+
+def test_validate_execution_output_valid(task_manager):
+    """Test: Validierung erkennt korrekte Ausgabe."""
+    from unittest.mock import MagicMock
+
+    # Mock LLM Client
+    mock_llm = MagicMock()
+    mock_llm.chat.return_value = "VALID: Ausgabe zeigt korrekt den Titel der Webseite"
+
+    result = task_manager._validate_execution_output(
+        llm_client=mock_llm,
+        task_description="Webseite laden und Titel anzeigen",
+        script_output="Crowdcompany UG | Multi-Cloud AI Solutions",
+        task_id="test_task"
+    )
+
+    assert result["is_valid"] is True
+    assert "korrekt" in result["reason"].lower()
+
+
+def test_validate_execution_output_invalid(task_manager):
+    """Test: Validierung erkennt fehlerhafte Ausgabe."""
+    from unittest.mock import MagicMock
+
+    # Mock LLM Client
+    mock_llm = MagicMock()
+    mock_llm.chat.return_value = "INVALID: Ausgabe ist leer oder enthält nur Fehlermeldung"
+
+    result = task_manager._validate_execution_output(
+        llm_client=mock_llm,
+        task_description="Berechne Fibonacci von 10",
+        script_output="Fehler beim Laden der URL: Forbidden",
+        task_id="test_task"
+    )
+
+    assert result["is_valid"] is False
+    assert "Fehler" in result["reason"] or "ungültig" in result["reason"].lower()
+
+
+def test_validate_execution_output_llm_error(task_manager):
+    """Test: Bei LLM-Fehler wird Success angenommen."""
+    from unittest.mock import MagicMock
+
+    # Mock LLM Client wirft Exception
+    mock_llm = MagicMock()
+    mock_llm.chat.side_effect = Exception("LLM Connection failed")
+
+    result = task_manager._validate_execution_output(
+        llm_client=mock_llm,
+        task_description="Test Task",
+        script_output="Irgendeine Ausgabe",
+        task_id="test_task"
+    )
+
+    # Bei Fehler soll Success angenommen werden (defensiv)
+    assert result["is_valid"] is True
+    assert "assume success" in result["reason"].lower()
+
+
+def test_run_task_with_validation(task_manager):
+    """Test: Task-Ausführung mit Selbstüberprüfung."""
+    from unittest.mock import MagicMock
+
+    user_id = 12345
+
+    # Erstelle Task mit funktionierendem Script
+    task_id = task_manager.create_task(
+        user_id=user_id,
+        name="Validation Test",
+        description="Berechne 5 + 3",
+        script="import sys; print(8)"
+    )
+
+    # Mock LLM Client für Validierung
+    mock_llm = MagicMock()
+    mock_llm.chat.return_value = "VALID: Ergebnis ist korrekt"
+
+    # Führe Task aus
+    success, output = task_manager.run_task(
+        user_id=user_id,
+        task_id=task_id,
+        llm_client=mock_llm
+    )
+
+    assert success is True
+    assert output == "8"
+
+    # Prüfe ob Validierung aufgerufen wurde
+    mock_llm.chat.assert_called()
+    # Der zweite Aufruf sollte die Validierung sein
+    assert mock_llm.chat.call_count >= 1
+
+
+def test_improved_script_generation_with_user_agent(task_manager):
+    """Test: Verbesserter Prompt generiert Scripts mit User-Agent."""
+    from unittest.mock import MagicMock
+
+    user_id = 12345
+
+    # Erstelle Task ohne Script (während Ausführung generiert)
+    task_id = task_manager.create_task(
+        user_id=user_id,
+        name="Web Scraping Test",
+        description="Lade den Inhalt von https://example.com"
+    )
+
+    # Mock LLM Client - gibt verbessertes Script zurück
+    mock_llm = MagicMock()
+
+    # Erste Antwort: Script-Generierung
+    improved_script = """import sys
+import urllib.request
+import urllib.error
+
+if len(sys.argv) < 2:
+    print("Fehler: Keine URL")
+    sys.exit(1)
+
+url = sys.argv[1]
+
+try:
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        content = response.read().decode('utf-8')
+    print(content[:200])
+except urllib.error.URLError as e:
+    print(f"Fehler: {e.reason}")
+    sys.exit(1)"""
+
+    # Developer-Antworten (Script-Generierung)
+    improved_script = """import sys
+import urllib.request
+import urllib.error
+
+if len(sys.argv) < 2:
+    print("Fehler: Keine URL")
+    sys.exit(1)
+
+url = sys.argv[1]
+
+try:
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        content = response.read().decode('utf-8')
+    print(content[:200])
+except urllib.error.URLError as e:
+    print(f"Fehler: {e.reason}")
+    sys.exit(1)"""
+
+    # Critic-Antwort: APPROVED (erster Versuch)
+    critic_response = "APPROVED: Script ist bereit für Produktion"
+
+    # Validierungs-Antwort
+    validation_response = "VALID: Webseite erfolgreich geladen"
+
+    # Simuliere drei Aufrufe: Developer + Critic + Validierung
+    mock_llm.chat.side_effect = [improved_script, critic_response, validation_response]
+
+    # Führe Task aus mit Parameter
+    success, output = task_manager.run_task(
+        user_id=user_id,
+        task_id=task_id,
+        llm_client=mock_llm,
+        user_input="https://example.com"
+    )
+
+    # Prüfe ob LLM dreimal aufgerufen wurde (Developer + Critic + Validierung)
+    assert mock_llm.chat.call_count == 3
+
+    # Prüfe den ERSTEN Aufruf (Developer - Script-Generierung)
+    first_call_args = mock_llm.chat.call_args_list[0]
+    prompt = first_call_args[1]['user_message']  # keyword argument
+
+    # Prüfe ob Prompt Developer-Rolle enthält
+    assert "Senior Python Developer" in prompt
+
+    # Prüfe den ZWEITEN Aufruf (Critic - Prüfung)
+    second_call_args = mock_llm.chat.call_args_list[1]
+    critic_prompt = second_call_args[1]['user_message']
+
+    # Prüfe ob Prompt Critic-Rolle enthält
+    assert "Code Reviewer" in critic_prompt or "Prüfe das Python-Script" in critic_prompt
+

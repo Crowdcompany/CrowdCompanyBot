@@ -317,45 +317,72 @@ class TaskManager:
         if not task:
             return False, f"Task {task_id} nicht gefunden"
 
-        # Wenn kein Script vorhanden, generiere eines
+        # Wenn kein Script vorhanden, generiere eines mit Multi-Agenten-System
         if not task.get("script") or task["script"].strip() == "":
-            logger.info(f"Generiere Script für Task {task_id}...")
-
-            # LLM-Prompt für Script-Generierung
-            script_prompt = f"""Erstelle ein Python-Script für folgende Aufgabe:
-
-Beschreibung: {task['description']}
-
-Anforderungen:
-- Das Script soll die Aufgabe erfüllen
-- Nutze sys.argv[1] wenn ein Parameter übergeben werden soll
-- Gib das Ergebnis mit print() aus
-- Kein Input vom Benutzer während der Ausführung
-- Nur reiner Python-Code ohne Kommentare oder Erklärungen
-- Nutze nur Standard-Library (keine externen Pakete)
-
-Schreibe nur den Python-Code, keine Markdown-Formatierung."""
+            logger.info(f"Generiere Script für Task {task_id} mit Multi-Agenten-System...")
 
             try:
-                script = llm_client.chat(user_message=script_prompt, max_tokens=500)
+                # Multi-Agenten-Loop: Developer + Critic
+                max_iterations = 3
+                approved_script = None
+                iteration_history = []
 
-                # Entferne Markdown-Code-Blöcke falls vorhanden
-                script = script.strip()
-                if script.startswith("```python"):
-                    script = script.split("```python", 1)[1]
-                if script.startswith("```"):
-                    script = script.split("```", 1)[1]
-                if script.endswith("```"):
-                    script = script.rsplit("```", 1)[0]
-                script = script.strip()
+                for iteration in range(max_iterations):
+                    logger.info(f"Developer-Critic Iteration {iteration + 1}/{max_iterations}")
 
-                # Speichere generiertes Script
-                self.update_task(user_id, task_id, script=script)
-                task["script"] = script
-                logger.info(f"Script generiert für Task {task_id}")
+                    # 1. DEVELOPER: Script generieren (oder verbessern)
+                    if iteration == 0:
+                        # Erste Iteration: Neues Script erstellen
+                        developer_prompt = self._build_developer_prompt(task['description'], iteration_history)
+                    else:
+                        # Folge-Iterationen: Script basierend auf Critic-Feedback verbessern
+                        developer_prompt = self._build_improvement_prompt(task['description'], iteration_history)
+
+                    script = llm_client.chat(user_message=developer_prompt, max_tokens=1000)
+
+                    # Markdown-Code-Blöcke entfernen
+                    script = self._clean_script_code(script)
+
+                    logger.info(f"Developer hat Script generiert (Iteration {iteration + 1})")
+
+                    # 2. CRITIC: Script prüfen
+                    critic_result = self._critic_script(
+                        llm_client=llm_client,
+                        task_description=task['description'],
+                        script=script
+                    )
+
+                    logger.info(f"Critic Bewertung: {critic_result['status']}")
+
+                    # Iteration speichern
+                    iteration_history.append({
+                        'iteration': iteration + 1,
+                        'script': script,
+                        'critic_status': critic_result['status'],
+                        'critic_feedback': critic_result['feedback']
+                    })
+
+                    # 3. Wenn Critic approves → Fertig
+                    if critic_result['status'] == 'APPROVED':
+                        approved_script = script
+                        logger.info(f"Script vom Critic freigegeben nach {iteration + 1} Iteration(en)")
+                        break
+                    else:
+                        logger.warning(f"Critic ablehnt ab: {critic_result['feedback'][:100]}...")
+                        # Loop continues mit verbessertem Prompt
+
+                # Wenn kein Script freigegeben wurde, nehme das letzte (als Fallback)
+                if not approved_script:
+                    logger.warning("Kein Script vom Critic freigegeben, nehme letzte Version als Fallback")
+                    approved_script = iteration_history[-1]['script']
+
+                # Speichere freigegebenes Script
+                self.update_task(user_id, task_id, script=approved_script)
+                task["script"] = approved_script
+                logger.info(f"Script nach {len(iteration_history)} Developer-Critic Iterationen generiert")
 
             except Exception as e:
-                error_msg = f"Fehler bei Script-Generierung: {str(e)}"
+                error_msg = f"Fehler bei Multi-Agenten Script-Generierung: {str(e)}"
                 logger.error(error_msg)
                 self.update_task(user_id, task_id, error=error_msg)
                 return False, error_msg
@@ -390,6 +417,16 @@ Schreibe nur den Python-Code, keine Markdown-Formatierung."""
             # Erfolg?
             if result.returncode == 0:
                 output = result.stdout.strip()
+
+                # Selbstüberprüfung: LLM analysiert das Ergebnis
+                validation_result = self._validate_execution_output(
+                    llm_client=llm_client,
+                    task_description=task['description'],
+                    script_output=output,
+                    task_id=task_id
+                )
+
+                # Speichere Ergebnis
                 self.update_task(
                     user_id,
                     task_id,
@@ -397,7 +434,13 @@ Schreibe nur den Python-Code, keine Markdown-Formatierung."""
                     output=output,
                     execution_time=execution_time
                 )
-                logger.info(f"Task {task_id} erfolgreich ausgeführt")
+
+                # Logge Validierungsergebnis
+                if validation_result["is_valid"]:
+                    logger.info(f"Task {task_id} erfolgreich ausgeführt und validiert")
+                else:
+                    logger.warning(f"Task {task_id} ausgeführt aber Validierung kritisiert: {validation_result['reason']}")
+
                 return True, output
             else:
                 error = result.stderr.strip() or "Script returned non-zero exit code"
@@ -422,6 +465,64 @@ Schreibe nur den Python-Code, keine Markdown-Formatierung."""
             self.update_task(user_id, task_id, error=error_msg)
             logger.error(f"Task {task_id} Exception: {e}")
             return False, error_msg
+
+    def _validate_execution_output(
+        self,
+        llm_client,
+        task_description: str,
+        script_output: str,
+        task_id: str
+    ) -> dict:
+        """
+        Analysiert die Script-Ausgabe mit LLM und prüft, ob das Ergebnis die Anforderung erfüllt.
+
+        Args:
+            llm_client: LLMClient-Instanz
+            task_description: Die ursprüngliche Aufgabenbeschreibung
+            script_output: Die Ausgabe des Scripts
+            task_id: Task-ID für Logging
+
+        Returns:
+            dict mit 'is_valid' (bool) und 'reason' (str)
+        """
+        validation_prompt = f"""Analysiere die Ausgabe eines Python-Scripts und prüfe, ob die Aufgabe erfüllt wurde.
+
+AUFGABE: {task_description}
+
+SCRIPT-AUSGABE:
+{script_output}
+
+PRÜFUNG:
+1. Erfüllt die Ausgabe die Anforderung?
+2. Gibt es offensichtliche Fehler oder Probleme?
+3. Ist das Ergebnis plausibel und vollständig?
+
+ANTWORT FORMAT:
+Gib nur eine Zeile zurück mit entweder:
+- VALID: <kurze Bestätigung was gut ist>
+- INVALID: <kurze Erklärung was fehlt oder falsch ist>
+
+Beispiele:
+- VALID: Ausgabe zeigt korrekt den Titel der Webseite
+- VALID: Berechnung ergibt korrektes Ergebnis
+- INVALID: Ausgabe ist leer oder enthält nur Fehlermeldung
+- INVALID: Ergebnis entspricht nicht der Anforderung"""
+
+        try:
+            response = llm_client.chat(user_message=validation_prompt, max_tokens=100).strip()
+
+            # Parse Antwort
+            if response.upper().startswith("VALID"):
+                logger.info(f"Task {task_id} Validierung: {response}")
+                return {"is_valid": True, "reason": response}
+            else:
+                logger.warning(f"Task {task_id} Validierung: {response}")
+                return {"is_valid": False, "reason": response}
+
+        except Exception as e:
+            logger.error(f"Fehler bei Validierung von Task {task_id}: {e}")
+            # Bei Validierungsfehler assume success (besser als false positive)
+            return {"is_valid": True, "reason": "Validierung fehlgeschlagen, assume success"}
 
     def save_as_skill(
         self,
@@ -868,3 +969,144 @@ Schreibe nur den Python-Code, keine Markdown-Formatierung."""
         except Exception as e:
             logger.error(f"Fehler beim Verschieben von Task {task_id}: {e}")
             return False
+
+    def _build_developer_prompt(self, task_description: str, iteration_history: list) -> str:
+        """Erstellt Prompt für Developer-Agent (Script-Generierung)."""
+        return f"""Du bist ein Senior Python Developer. Erstelle ein robustes, fehlerfreies Python-Script.
+
+AUFGABE: {task_description}
+
+ANFORDERUNGEN:
+1. SYNTAX: Perfektes Python, keine f-string Fehler, keine Indentation errors
+2. STRUKTUR: Nutze main() Funktion und if __name__ == "__main__"
+3. FEHLERBEHANDLUNG: Alle externen Operationen in try/except
+4. IMPORTS: Nur Standard-Library (sys, os, urllib, json, subprocess, platform, socket)
+5. AUSGABE: Ergebnis mit print() ausgeben
+6. PARAMETER: Über sys.argv[1] lesen wenn benötigt
+
+BEISPIEL-STRUKTUR:
+```python
+import sys
+import os
+
+def main():
+    try:
+        # Dein Code hier
+        if len(sys.argv) > 1:
+            param = sys.argv[1]
+        result = "..."
+        print(result)
+    except Exception as e:
+        print(f"Fehler: {{e}}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+```
+
+WICHTIG:
+- Schreibe KOMPLETTES, lauffähiges Script
+- Keine abgeschnittenen Strings oder f-strings
+- Korrekte Einrückung (4 Spaces)
+- Alle Strings korrekt schließen
+
+Schreibe nur den Python-Code ohne Markdown."""
+
+    def _build_improvement_prompt(self, task_description: str, iteration_history: list) -> str:
+        """Erstellt Prompt für Developer-Agent (Script-Verbesserung basierend auf Critic-Feedback)."""
+        last_feedback = iteration_history[-1]['critic_feedback']
+
+        return f"""Du bist ein Senior Python Developer. Verbessere das Script basierend auf dem Feedback.
+
+AUFGABE: {task_description}
+
+KRITIK VOM CODE REVIEWER:
+{last_feedback}
+
+DEIN JOB:
+1. Analysiere das Kritik-Punkte
+2. Korrigiere ALLE genannten Fehler
+3. Stelle sicher, dass das Script syntaktisch korrekt ist
+4. Achte auf: f-string Schließung, Klammern, Indentation
+
+WICHTIGSTE REGELN:
+- Alle f-strings MÜSSEN korrekt geschlossen sein: print(f"...")
+- Keine unvollständigen Strings
+- Korrekte Exception-Handling
+- Alle imports am Anfang
+
+Schreibe nur den korrigierten Python-Code ohne Markdown."""
+
+    def _critic_script(self, llm_client, task_description: str, script: str) -> dict:
+        """
+        Critic-Agent: Prüft das Script auf Syntax und Logik-Fehler.
+
+        Returns:
+            dict with 'status' ('APPROVED' or 'NEEDS_IMPROVEMENT') and 'feedback' (str)
+        """
+        critic_prompt = f"""Du bist ein strenger Code Reviewer. Prüfe das Python-Script.
+
+AUFGABE: {task_description}
+
+ZU PRÜFENDES SCRIPT:
+{script}
+
+PRÜFUNG:
+1. SYNTAX-FEHLER:
+   - Alle f-strings korrekt geschlossen? (print(f"...) ))
+   - Alle Klammern paarig?
+   - Korrekte Indentation?
+   - Alle Strings geschlossen?
+
+2. IMPORTS:
+   - Nur Standard-Library?
+   - Alle imports korrekt?
+
+3. LOGIK:
+   - Erfüllt Script die Aufgabe?
+   - Gibt es offensichtliche Logik-Fehler?
+
+4. AUSFÜHRUNG:
+   - Wird das Script laufen ohne Fehler?
+
+ENTSCHEIDUNG:
+- Wenn ALLES korrekt → "APPROVED: Script ist bereit für Produktion"
+- Wenn FEHLER gefunden → "NEEDS_IMPROVEMENT: <Liste der Fehler mit Lösungsvorschlägen>"
+
+Gib nur EINE Zeile zurück mit entweder APPROVED oder NEEDS_IMPROVEMENT."""
+
+        try:
+            response = llm_client.chat(user_message=critic_prompt, max_tokens=200).strip()
+
+            if "APPROVED" in response.upper():
+                return {
+                    'status': 'APPROVED',
+                    'feedback': response
+                }
+            else:
+                return {
+                    'status': 'NEEDS_IMPROVEMENT',
+                    'feedback': response
+                }
+        except Exception as e:
+            logger.error(f"Fehler bei Critic-Prüfung: {e}")
+            # Bei Fehler: Defensive → Approven
+            return {
+                'status': 'APPROVED',
+                'feedback': f'Critic fehlgeschlagen, auto-approved: {e}'
+            }
+
+    def _clean_script_code(self, script: str) -> str:
+        """Entfernt Markdown-Code-Blöcke und bereinigt das Script."""
+        script = script.strip()
+
+        # Markdown-Code-Blöcke entfernen
+        if script.startswith("```python"):
+            script = script.split("```python", 1)[1]
+        if script.startswith("```"):
+            script = script.split("```", 1)[1]
+        if script.endswith("```"):
+            script = script.rsplit("```", 1)[0]
+
+        return script.strip()
+

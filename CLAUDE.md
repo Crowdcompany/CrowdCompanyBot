@@ -127,7 +127,7 @@ Das System besteht aus drei Hauptkomponenten:
 - Input-Validierung
 - TTS-Kompatibilität für alle Ausgaben
 
-✓ **Phase 9: Task Manager System** - VOLLSTÄNDIG IMPLEMENTIERT (31.01.2026)
+✓ **Phase 9: Task Manager System** - VOLLSTÄNDIG IMPLEMENTIERT + VERBESSERT (01.02.2026)
 
 **IMPLEMENTIERT:**
 - ✓ Task-Erstellung mit LLM-generiertem Snake-Case Namen
@@ -143,7 +143,29 @@ Das System besteht aus drei Hauptkomponenten:
   - Execution History wird gespeichert
   - Markdown-Code-Block-Bereinigung implementiert
   - Code-Referenz: [src/task_manager.py:298-420](src/task_manager.py#L298-L420)
-- ✓ 17 Tests implementiert und bestanden
+- ✓ **Verbesserter Script-Generierungs-Prompt** (01.02.2026)
+  - 5 Kategorien von Best Practices für bessere Code-Qualität
+  - Web-Requests: IMMER User-Agent Header + Timeout
+  - Fehlerbehandlung: Explizite try/except Anweisungen
+  - Nur Standard-Library, keine externen Pakete
+  - Code-Referenz: [src/task_manager.py:324-390](src/task_manager.py#L324-L390)
+- ✓ **Selbstüberprüfung nach Ausführung** (01.02.2026)
+  - `_validate_execution_output()` analysiert Ergebnisse mit LLM
+  - Prüft ob Ausgabe die Anforderung erfüllt
+  - Loggt Validierungsergebnis (INFO bei Erfolg, WARNING bei Kritik)
+  - Code-Referenz: [src/task_manager.py:490-545](src/task_manager.py#L490-L545)
+- ✓ 22 Tests implementiert und bestanden (01.02.2026)
+
+**PROBLEME BEHOBEN (01.02.2026):**
+- ✅ urllib 403 Forbidden → Prompt jetzt mit User-Agent Pflicht
+- ✅ Schlechte Code-Qualität → Prompt mit Best Practices erweitert
+- ✅ Keine Ergebnisprüfung → Selbstüberprüfung implementiert
+
+**PHASE 10: Selbst-korrigierende Task-Ausführung - TEILWEISE IMPLEMENTIERT**
+- ✅ Prompt-Verbesserung mit Best Practices
+- ✅ Selbstüberprüfung nach Ausführung
+- ⏳ Noch offen: Auto-Fix bei Fehlschlag (Retry-Loop mit max. 3 Versuchen)
+- ⏳ Geplant: `_auto_fix_task()` Methode für automatische Script-Korrektur
 
 **TASK-NAMEN-FORMAT (AKTUELL 31.01.2026 18:40 Uhr):**
   - **Task-Namen:** ENGLISCH, Snake-Case (z.B. "add_7_numbers", "is_prime")

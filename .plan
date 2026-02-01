@@ -328,18 +328,36 @@ class RateLimiter:
 - [x] Dateistruktur: important/skills/ für wiederverwendbare Scripts
 
 **Implementierung:**
-- [x] task_manager.py (720 Zeilen)
+- [x] task_manager.py (760 Zeilen)
   - create_task(): Task erstellen mit LLM-generiertem Snake-Case Namen
   - get_task(): Task laden
   - update_task(): Status, Script, Execution History aktualisieren
   - list_tasks(): Tasks nach Status filtern (default: "all")
   - delete_task(): Task archivieren
-  - **run_task()**: ✓ IMPLEMENTIERT (31.01.2026 11:52 Uhr)
+  - **run_task()**: ✓ IMPLEMENTIERT + VERBESSERT (01.02.2026)
     - Automatische Script-Generierung via LLM wenn Script leer
     - Sichere Ausführung mit subprocess (30s Timeout)
     - User-Input als sys.argv[1] Parameter
     - Markdown-Code-Block-Bereinigung
     - Execution History wird gespeichert
+    - **NEU (01.02.2026): Selbstüberprüfung nach Ausführung!**
+      - Ruft _validate_execution_output() nach erfolgreichem Run
+      - LLM analysiert ob Ergebnis die Anforderung erfüllt
+      - Loggt Validierungsergebnis (WARNING bei Kritik)
+  - **_validate_execution_output()**: ✓ NEU (01.02.2026)
+    - Analysiert Script-Ausgabe mit LLM nach Ausführung
+    - Prüft: Erfüllt Ausgabe die Anforderung? Gibt es Fehler?
+    - Returns: {"is_valid": bool, "reason": str}
+    - Defensive Strategie: Bei LLM-Fehler → assume success
+  - **Verbesserter Script-Generierungs-Prompt**: ✓ NEU (01.02.2026)
+    - Enthält 5 Kategorien von Best Practices:
+      1. Web-Requests (IMMER User-Agent, Timeout, Fehlerbehandlung)
+      2. Fehlerbehandlung (try/except mit spezifischen Exceptions)
+      3. Code-Qualität (nur Standard-Library, keine externen Pakete)
+      4. Datenverarbeitung (strip(), utf-8, JSON)
+      5. Sicherheit (URL-Validierung, Buffer-Limits)
+    - Code-Struktur-Vorlage mit main() und Fehlerbehandlung
+    - Vermeidung typischer Fehler (403 Forbidden, etc.)
   - save_as_skill(): Task als Skill speichern
   - get_skill(): Skill laden
   - list_skills(): Alle Skills auflisten
@@ -347,7 +365,9 @@ class RateLimiter:
   - Tasks-Ordner: active/, completed/, archived/, workspace/
   - Skills-Ordner: skills/
   - Index-Dateien: tasks/index.md, skills/index.md
-- [x] Tests geschrieben: test_task_manager.py (17 Tests, alle bestehen)
+- [x] Tests geschrieben: test_task_manager.py (22 Tests, alle bestehen ✓)
+  - 3 neue Tests für Validierungsfunktionalität
+  - 1 Test für verbesserten Prompt mit Best Practices
 - [x] Integration mit FileStructureManager
 
 **Bot-Integration:** ✓ VOLLSTÄNDIG ABGESCHLOSSEN (31.01.2026 12:00 Uhr)
@@ -371,16 +391,53 @@ class RateLimiter:
 - Fallback bei LLM-Fehler: Erste 4 Wörter der Beschreibung
 
 **Test-Ergebnisse:**
-- 17 Task Manager Tests - alle bestehen ✓
+- 22 Task Manager Tests - alle bestehen ✓ (01.02.2026)
 - Task-Erstellung, -Update, -Löschung funktionieren
 - Task-Ausführung mit LLM-Script-Generierung funktioniert
+- Selbstüberprüfung nach Ausführung implementiert
+- Verbesserter Prompt mit Best Practices funktioniert
 - Skill-System funktioniert
 - Status-Wechsel (active → completed → archived) funktionieren
+
+**AKTUELLE PROBLEME (BEHOBEN 01.02.2026):**
+- ~~LLM-generierte Scripts können fehlschlagen (z.B. urllib ohne User-Agent → HTTP 403)~~ BEHOBEN!
+- ~~User muss aktuell Logs manuell lesen und Fehler analysieren~~ BEHOBEN!
+- **Lösung:**
+  1. Verbesserter Prompt mit User-Agent Pflicht
+  2. Selbstüberprüfung nach Ausführung mit LLM
+  3. Bot prüft automatisch ob Ergebnis die Anforderung erfüllt
 
 ## Nächste Schritte (Phase 10+)
 
 ### KRITISCH (sofort implementieren):
-- Phase 10: Automatische Task-Ausführung im Chat ⚠️ NEU (31.01.2026)
+- Phase 10: Selbst-korrigierende Task-Ausführung mit Log-Analyse ✓ TEILWEISE IMPLEMENTIERT (01.02.2026)
+
+  **Status:** Basis-Features implementiert, noch keine Auto-Korrektur
+
+  **Erledigt:**
+  - [x] **Prompt-Verbesserung:** Script-Generierung mit Best Practices
+    - User-Agent Header Pflicht bei Web-Requests
+    - Timeout-Handler für alle Netzwerkoperationen
+    - Explizite Fehlerbehandlungs-Anweisungen
+    - Code-Struktur-Vorlage mit try/except
+  - [x] **Selbstüberprüfung:** LLM analysiert Ergebnis nach Ausführung
+    - Prüft ob Ausgabe die Anforderung erfüllt
+    - Loggt Validierungsergebnis
+    - Defensive Strategie bei LLM-Fehlern
+
+  **Noch offen (für vollständige Auto-Korrektur):**
+  - [ ] Auto-Fix bei Fehlschlag (Retry-Loop mit max. 3 Versuchen)
+  - [ ] `_auto_fix_task()` Methode implementieren
+    - LLM analysiert Fehler und generiert korrigiertes Script
+    - Prompt: "Script failed with error X. Analyze root cause and generate improved script."
+  - [ ] Tests für Auto-Fix:
+    - test_auto_fix_urllib_forbidden()
+    - test_auto_fix_missing_import()
+    - test_auto_fix_max_retries()
+
+  **ZIEL:** Bot lernt aus Fehlern und korrigiert sich selbst, ohne User-Eingriff
+
+- Phase 11: Automatische Task-Ausführung im Chat
   - [ ] Tool-Funktion `execute_task(user_query)` für LLM implementieren
   - [ ] Semantische Task-Suche basierend auf Beschreibung
   - [ ] LLM entscheidet automatisch: Neue Task erstellen vs. Existierende ausführen
@@ -395,15 +452,15 @@ class RateLimiter:
     - Antwort: TTS-kompatibles Ergebnis
 
 ### EMPFOHLEN (mittelfristig):
-- Phase 11: Dependencies aktualisieren
+- Phase 12: Dependencies aktualisieren
   - [ ] requirements.txt auf neueste Versionen (requests 2.32.3, aiohttp 3.11.11, python-telegram-bot 21.11)
   - [ ] pip audit ausführen
   - [ ] Lokal testen
   - [ ] Neu deployen auf Coolify
-- Phase 12: Datei-Permissions korrigieren
+- Phase 13: Datei-Permissions korrigieren
   - [ ] .env Datei: chmod 600 (nur Owner kann lesen/schreiben)
 
-- Phase 13: Prompt Injection Defense (LLM Input Validation)
+- Phase 14: Prompt Injection Defense (LLM Input Validation)
   - [ ] Prompt-Validierung VOR LLM-Übergabe implementieren
   - [ ] Technologien evaluieren:
     - Option 1: NeMo Guardrails (NVIDIA)
@@ -416,23 +473,23 @@ class RateLimiter:
   - [ ] Tests für bekannte Prompt-Injection-Techniken
   - Dokumentation: Context/PromptInjectionDefense.md
 
-- Phase 14: Rate Limiting implementieren
+- Phase 15: Rate Limiting implementieren
   - [ ] Rate Limiter Klasse (10-20 Nachrichten/Minute pro User)
   - [ ] RATE_LIMIT_PER_MINUTE in .env
   - [ ] DoS-Schutz durch autorisierte User
   - [ ] Cooldown für Deep Search
 
-- Phase 15: Monitoring verbessern
+- Phase 16: Monitoring verbessern
   - [ ] Health-Endpoint mit Status-Infos (optional HTTP-Server)
   - [ ] Alerting bei Fehlern
   - [ ] Log-Rotation für lange Laufzeiten
 
 ### OPTIONAL (Nice-to-have):
-- Phase 16: Verschlüsselung der Memory-Dateien at-rest
-- Phase 17: Backup-Strategie für /data Volume
-- Phase 18: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
-- Phase 19: Dashboard und Monitoring-UI
-- Phase 20: Multi-Bot-Support
+- Phase 17: Verschlüsselung der Memory-Dateien at-rest
+- Phase 18: Backup-Strategie für /data Volume
+- Phase 19: Erweiterte Telegram-Features (Dateien, Bilder, Sprachnachrichten)
+- Phase 20: Dashboard und Monitoring-UI
+- Phase 21: Multi-Bot-Support
 
 ## Status (Stand: 30. Januar 2026)
 

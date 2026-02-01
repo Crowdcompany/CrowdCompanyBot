@@ -13,7 +13,7 @@ Ein selbst gehosteter KI-Assistent als sichere Alternative zu Moltbot.
 
 ## Status
 
-**Version 1.2 - Produktiv Einsetzbar** (Stand: 31. Januar 2026)
+**Version 1.01 - Multi-Agenten Task-System** (Stand: 1. Februar 2026)
 
 - ✓ Telegram-Authentifizierung mit Allowlist
 - ✓ GLM-4.7 Sprachmodell via glmproxy.ccpn.cc
